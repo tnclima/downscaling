@@ -88,3 +88,25 @@ create_emtpy_netcdf <- function(file_template,
 
 
 
+l_nc_info <- list(
+  tasmax = list(name = "tasmax",
+                units = "degC",
+                longname = "Daily Maximum Near-Surface Air Temperature",
+                cell_methods = "time: maximum",
+                standard_name = "air_temperature"),
+  tasmin = list(name = "tasmin",
+                units = "degC",
+                longname = "Daily Minimum Near-Surface Air Temperature",
+                cell_methods = "time: minimum",
+                standard_name = "air_temperature"),
+  tas = list(name = "tas",
+             units = "degC",
+             longname = "Daily Mean Near-Surface Air Temperature",
+             cell_methods = "time: mean",
+             standard_name = "air_temperature"),
+  pr = list(name = "pr",
+            units = "kg m-2",
+            longname = "Daily Precipitation",
+            cell_methods = "time: sum",
+            standard_name = "precipitation_amount")
+)  
