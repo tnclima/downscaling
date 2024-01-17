@@ -11,6 +11,8 @@ inv_sub <- function(
   
   dat_kkz <- readRDS("data/sub-ensemble-kkz-01-selected-models.rds")
   dat_inv <- get_inventory(path_ds)
+  dat_inv[variable == "orog" & institute_rcm == "UHOH-WRF361H", 
+          institute_rcm := "IPSL-WRF381P"] # since wrf381 has no fx info
   dat_inv_sub <- dat_inv[variable != "orog"] %>% 
     merge(dat_kkz,
           by = c("gcm", "institute_rcm", "experiment", "ensemble",

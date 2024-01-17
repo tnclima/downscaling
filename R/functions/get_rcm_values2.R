@@ -25,7 +25,7 @@ get_rcm_values2 <- function(i_cell,
                             mat_rcm,
                             rs_rcm_orog,
                             type,
-                            n_cells = 1L,
+                            n_cells = 1,
                             elev_obs,
                             weight_by = list(tau_h = 50000, tau_v = 200)){
   
@@ -35,23 +35,21 @@ get_rcm_values2 <- function(i_cell,
   
   if(type == "xy"){
 
-    if(n_cells == 1L){
-      vals_mat <- mat_rcm[i_cell_rcm, ]
+    if(n_cells == 1){
+      vals_mat <- mat_rcm[i_cell_rcm, , drop = F]
+      i_coi <- 1
     } else {
       stopifnot(n_cells %% 2 == 1)
       neigh_cells <- adjacent(rs_rcm_orog, i_cell_rcm, 
                               directions = matrix(T, n_cells, n_cells)) %>% as.vector()
       neigh_cells <- neigh_cells[!is.na(neigh_cells)]
       vals_mat <- mat_rcm[neigh_cells, ]
+      i_coi <- which(neigh_cells == i_cell_rcm)
     }
-  
+    
     vals_rcm <- unname(t(vals_mat))
-    
     # put cell of interest first
-    i_coi <- which(neigh_cells == i_cell_rcm)
     vals_rcm <- cbind(vals_rcm[, i_coi, drop = F], vals_rcm[, -i_coi, drop = F])
-    
-    
     
   } else if(type == "elev"){
     
@@ -61,7 +59,7 @@ get_rcm_values2 <- function(i_cell,
     rs_weight_v <- exp( -((rs_rcm_orog - elev_obs)^2) / (weight_by$tau_v^2/log(2)) ) 
     rs_weight <- rs_weight_h*rs_weight_v
     
-    if(n_cells == 1L){
+    if(n_cells == 1){
       i_cell_rcm_selected <- which.max(as.vector(rs_weight))
     } else {
       i_cell_rcm_selected <- sort(as.vector(rs_weight), 
