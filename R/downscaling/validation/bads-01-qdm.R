@@ -6,6 +6,7 @@ library(lubridate)
 library(data.table)
 setDTthreads(4)
 library(fs)
+library(foreach)
 # library(ggplot2)
 # library(patchwork)
 # library(mgcViz)
@@ -19,16 +20,18 @@ source("R/functions/inv_sub.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/zz_temp/loop-test-qdm-nodetrend/"
+path_out <- "/home/climatedata/downscaling/validation-cv/data-daily/bads-qdm/"
 
-years_train_period <- c(1991,2020)
-# wet_day <- F # or numeric threshold, e.g. 0.1
-# l_wet_day <- list(tasmax = F, tasmin = F, pr = T) # or numeric threshold, e.g. 0.1
-l_ratio <- list(tasmax = F, tasmin = F, pr = T) # ratio in QDM()
+date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
+l_years_train_period <- list(c(1981,2000), c(2001,2020))
+# l_wet_day <- list(tasmax = F, tasmin = F, pr = 0.05) # QM: 0.05 for consistency with QDM()
+l_ratio <- list(tasmax = F, tasmin = F, pr = T) # QDM: ratio in QDM()
 cell_match_type <-  "xy" # elev or xy
-n_cells <- 1 # number of cells for elev, or width (odd) of square for xy
+n_cells <- 3 # number of cells for elev, or width (odd) of square for xy
 detrend <- F # detrend tas*  prior to ba? (and add trend back future)
-read_obs_memory <- F # reduces computation time, increases memory usage
+read_obs_memory <- F # reduces computation time, increases memory usage (a lot for 1km data!)
+n_nc_sync <- 200 # intermediate save to nc_out file every n cells
+
 
 l_file_obs <- list(
   tasmax = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MaxTemp.nc",
@@ -42,17 +45,22 @@ l_file_obs_orog <- list(
   pr = "/home/climatedata/obs/orography/crespi_lonlat_1km_precipitation.nc"
 )
 
+dir_create(path_out)
+
 # inventory ---------------------------------------------------------------
 
 dat_inv <- inv_sub()
-# dat_inv_loop <- dat_inv[experiment == "rcp85" & variable %in% c("tasmin", "tasmax", "pr")]
 dat_inv_loop <- dat_inv[experiment == "rcp85" & 
-                          variable %in% c("tasmin", "tasmax", "pr") & 
-                          institute_rcm %in% c("SMHI-RCA4", "IPSL-WRF381P")]
+                          variable %in% c("tasmin", "tasmax", "pr")]
+
 # main loop ---------------------------------------------------------------
 
+mitmatmisc::init_parallel_ubuntu(6)
 
-for(i_inv in 1:nrow(dat_inv_loop)){
+zz <- foreach(
+  i_inv = 1:nrow(dat_inv_loop),
+  .inorder = F
+) %dopar% {
   
   i_rcm_name <- dat_inv_loop[i_inv, institute_rcm]
   i_var <- dat_inv_loop[i_inv, variable]
@@ -69,7 +77,7 @@ for(i_inv in 1:nrow(dat_inv_loop)){
                    ext = "nc")
   
   
-  if(file_exists(file_out)) next
+  if(file_exists(file_out)) return(NULL)
   
   
   
@@ -120,15 +128,18 @@ for(i_inv in 1:nrow(dat_inv_loop)){
   create_emtpy_netcdf(file_template = file_obs_orog,
                       file_out = file_out,
                       l_varinfo = l_nc_info[[i_var]],
-                      date_period = range(dates_rcm),
+                      date_period = date_rcm_sub,
                       overwrite = F)
   
   
   # main proc ---------------------------------------------------------------
   
   nc_out <- nc_open(file_out, write = T)
+  i_nc_sync <- 0
   
   for(i_cell in cells_obs){
+    
+    i_nc_sync <- i_nc_sync + 1
     
     i_row <- rowFromCell(rs_obs, i_cell)
     i_col <- colFromCell(rs_obs, i_cell)
@@ -141,26 +152,13 @@ for(i_inv in 1:nrow(dat_inv_loop)){
     }
     elev_obs <- as.vector(rs_obs_orog)[i_cell]
     
-    # detrend obs past by month
     dat_obs <- data.table(date = dates_obs,
                           year = years_obs,
-                          year0 = years_obs - min(years_obs),
+                          # year0 = years_obs - min(years_obs),
                           month = months_obs,
                           month_fct = mitmatmisc::month_fct(months_obs),
                           value = vals_obs)
-    dat_obs <- dat_obs[year >= years_train_period[1] & year <= years_train_period[2]]
-    if(detrend & i_var != "pr"){
-      dat_obs_lm <- dat_obs[, broom::tidy(lm(value ~ year0)), month]
-      dat_obs <- dat_obs_lm[term == "year0", .(month, slope_year = estimate)] %>% 
-        merge(dat_obs)
-      dat_obs[, value_detrended := value - slope_year*year0]
-      
-      # ggplot(dat_obs, aes(year, value))+
-      #   geom_point()+
-      #   geom_smooth(method = lm)+
-      #   facet_wrap(~month_fct)
-    }
-    
+    dat_obs <- dat_obs[date >= date_rcm_sub[1] & date <= date_rcm_sub[2]]
     
     vals_rcm <- get_rcm_values2(i_cell, rs_cells_rcm_obs, mat_rcm,
                                 type = cell_match_type, n_cells = n_cells,
@@ -178,88 +176,121 @@ for(i_inv in 1:nrow(dat_inv_loop)){
     dat_rcm <- data.table(date = dates_rcm,
                           year = years_rcm,
                           decade = ceiling(years_rcm/10),
-                          year0 = years_rcm - min(years_rcm),
+                          # year0 = years_rcm - min(years_rcm),
                           month = months_rcm,
                           # month_fct = mitmatmisc::month_fct(months_rcm),
                           # value = vals_rcm,
                           value_ba = NA_real_) %>% 
       cbind(vals_rcm)
+    dat_rcm <- dat_rcm[date >= date_rcm_sub[1] & date <= date_rcm_sub[2]]
     
-    dat_rcm_hist <- dat_rcm[year >= years_train_period[1] & 
-                              year <= years_train_period[2]] %>% 
-      melt(id.vars = c("year", "year0", "month"), measure.vars = patterns("^V"))
-    
-    if(detrend & i_var != "pr"){
-      dat_rcm_hist_lm <- dat_rcm_hist[, broom::tidy(lm(value ~ year0)), .(month, variable)]
-      dat_rcm_hist <- dat_rcm_hist_lm[term == "year0", 
-                                      .(month, variable, slope_year = estimate)] %>% 
-        merge(dat_rcm_hist)
+    for(years_train_period in l_years_train_period){
       
-      dat_rcm_hist[, value_detrended := value - slope_year*year0]
-      
-      # ggplot(dat_rcm_hist, aes(year, value))+
-      #   geom_point()+
-      #   geom_smooth(method = lm)+
-      #   facet_grid(variable~month)
-    }
-    all_decades <- sort(unique(dat_rcm$decade))
-    
-    value_var <- if(detrend & i_var != "pr") "value_detrended" else "value"
-    
-    # moving window correction (+-1 month, +-1 decade)
-    for(i_month in 1:12){
-      i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
-      
-      vals_train_obs <- dat_obs[month %in% i_month_window][[value_var]]
-      vals_train_rcm <- dat_rcm_hist[month %in% i_month_window][[value_var]]
-      
-      for(i_decade in all_decades){
-        i_decade_window <- i_decade + c(-1:1)
-        dat_rcm_fut_window <- dat_rcm[month %in% i_month_window  & decade %in% i_decade_window] %>% 
-          melt(id.vars = c("year", "year0", "decade", "month"), measure.vars = patterns("^V"))
+      dat_obs_hist <- dat_obs[year >= years_train_period[1] & year <= years_train_period[2]]
+     
+      if(detrend & i_var != "pr"){
+        dat_obs_hist[, year0 := year - min(year)]
+        dat_obs_hist_lm <- dat_obs_hist[, broom::tidy(lm(value ~ year0)), month]
+        dat_obs_hist <- dat_obs_hist_lm[term == "year0", .(month, slope_year = estimate)] %>% 
+          merge(dat_obs_hist)
+        dat_obs_hist[, value_detrended := value - slope_year*year0]
         
-        if(detrend & i_var != "pr"){
-          # detrend future
-          dat_rcm_fut_window_lm <- dat_rcm_fut_window[, broom::tidy(lm(value ~ year0)), .(month, variable)]
-          dat_rcm_fut_window <- dat_rcm_fut_window_lm[term == "year0", 
-                                                      .(month, variable, slope_year = estimate)] %>% 
-            merge(dat_rcm_fut_window)
-          dat_rcm_fut_window[, value_detrended := value - slope_year*year0]
-          
-          # ggplot(dat_rcm_fut_window, aes(year, value))+
-          #   geom_point()+
-          #   geom_smooth(method = lm)+
-          #   facet_grid(variable~month)
-        }
-        vals_future_rcm <- dat_rcm_fut_window[[value_var]] # V1 is main value vector
-        l_qdm <- QDM(vals_train_obs, vals_train_rcm, vals_future_rcm,
-                     ratio = l_ratio[[i_var]])
-        dat_rcm_fut_window[, value_qdm := l_qdm$mhat.p]
-        
-        if(detrend & i_var != "pr"){
-          # add trend back
-          dat_rcm_fut_window[, value_qdm := value_qdm + slope_year*year0]
-        }
-        # update only month and decade in the middle (not moving)
-        dat_rcm[month == i_month & decade == i_decade, 
-                value_ba := dat_rcm_fut_window[month == i_month & decade == i_decade, value_qdm]]
-        
+        # ggplot(dat_obs_hist, aes(year, value))+
+        #   geom_point()+
+        #   geom_smooth(method = lm)+
+        #   facet_wrap(~month_fct)
       }
       
+      dat_rcm_hist <- dat_rcm[year >= years_train_period[1] & 
+                                year <= years_train_period[2]] %>% 
+        melt(id.vars = c("year", "month"), measure.vars = patterns("^V"))
+      
+      if(detrend & i_var != "pr"){
+        dat_rcm_hist[, year0 := year - min(year)]
+        dat_rcm_hist_lm <- dat_rcm_hist[, broom::tidy(lm(value ~ year0)), .(month, variable)]
+        dat_rcm_hist <- dat_rcm_hist_lm[term == "year0", 
+                                        .(month, variable, slope_year = estimate)] %>% 
+          merge(dat_rcm_hist)
+        
+        dat_rcm_hist[, value_detrended := value - slope_year*year0]
+        
+        # ggplot(dat_rcm_hist, aes(year, value))+
+        #   geom_point()+
+        #   geom_smooth(method = lm)+
+        #   facet_grid(variable~month)
+      }
+      
+      # all_decades <- sort(unique(dat_rcm$decade))
+      
+      value_var <- if(detrend & i_var != "pr") "value_detrended" else "value"
+      
+      # moving window correction (+-1 month, +-1 decade)
+      for(i_month in 1:12){
+        i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
+        
+        vals_train_obs <- dat_obs_hist[month %in% i_month_window][[value_var]]
+        vals_train_rcm <- dat_rcm_hist[month %in% i_month_window][[value_var]]
+        
+        # for(i_decade in all_decades){
+          # i_decade_window <- i_decade + c(-1:1)
+          dat_rcm_fut_window <- dat_rcm[month %in% i_month_window & 
+                                          # decade %in% i_decade_window &
+                                          !between(year, years_train_period[1], years_train_period[2])] %>% 
+            melt(id.vars = c("year","decade", "month"), 
+                 measure.vars = patterns("^V"))
+          
+          if(detrend & i_var != "pr"){
+            dat_rcm_fut_window[, year0 := year - min(year)]
+            # detrend future
+            dat_rcm_fut_window_lm <- dat_rcm_fut_window[, broom::tidy(lm(value ~ year0)), .(month, variable)]
+            dat_rcm_fut_window <- dat_rcm_fut_window_lm[term == "year0", 
+                                                        .(month, variable, slope_year = estimate)] %>% 
+              merge(dat_rcm_fut_window)
+            dat_rcm_fut_window[, value_detrended := value - slope_year*year0]
+            
+            # ggplot(dat_rcm_fut_window, aes(year, value))+
+            #   geom_point()+
+            #   geom_smooth(method = lm)+
+            #   facet_grid(variable~month)
+          }
+          
+          vals_future_rcm <- dat_rcm_fut_window[[value_var]] # V1 is main value vector
+          l_qdm <- QDM(vals_train_obs, vals_train_rcm, vals_future_rcm,
+                       ratio = l_ratio[[i_var]])
+          dat_rcm_fut_window[, value_qdm := l_qdm$mhat.p]
+          
+          if(detrend & i_var != "pr"){
+            # add trend back
+            dat_rcm_fut_window[, value_qdm := value_qdm + slope_year*year0]
+          }
+          # update only month and decade in the middle (not moving)
+          # dat_rcm[month == i_month & decade == i_decade, 
+          #         value_ba := dat_rcm_fut_window[month == i_month & decade == i_decade, value_qdm]]
+          dat_rcm[month == i_month & !between(year, years_train_period[1], years_train_period[2]), 
+                  value_ba := dat_rcm_fut_window[month == i_month & variable == "V1", value_qdm]]
+          
+        # }
+        
+      }
     }
+
     
     vals_out <- dat_rcm$value_ba
     ncvar_put(nc_out, varid = i_var, vals = vals_out, 
               start = c(i_col, i_row, 1), count = c(1, 1, -1))
     
-    nc_sync(nc_out)
+    if(i_nc_sync %% n_nc_sync == 0) nc_sync(nc_out)
     
     # cat(sprintf("%s - cell#(x,y): %i (%i,%i)", date(), i_cell, i_col, i_row), "\n")
     
   }
   
+  nc_sync(nc_out)
+  
   # fill with NA rest
+  i_nc_sync <- 0
   for(i_cell in cells_obs_na){
+    i_nc_sync <- i_nc_sync + 1
     
     i_row <- rowFromCell(rs_obs, i_cell)
     i_col <- colFromCell(rs_obs, i_cell)
@@ -267,7 +298,7 @@ for(i_inv in 1:nrow(dat_inv_loop)){
     ncvar_put(nc_out, varid = i_var, vals = rep(NA_real_, nc_out$dim$time$len), 
               start = c(i_col, i_row, 1), count = c(1, 1, -1))
     
-    nc_sync(nc_out)
+    if(i_nc_sync %% n_nc_sync == 0) nc_sync(nc_out)
     
     # cat(sprintf("%s - NA cell#(x,y): %i (%i,%i)", date(), i_cell, i_col, i_row), "\n")
   }

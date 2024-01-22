@@ -27,8 +27,9 @@ create_emtpy_netcdf <- function(file_template,
 
   # helpers
   nc_template <- nc_open(file_template)  
-  values_lon <- ncvar_get(nc_template, "longitude")
-  values_lat <- ncvar_get(nc_template, "latitude")
+  xy_names <- ncdf4.helpers::nc.get.dim.names(nc_template)
+  values_lon <- ncvar_get(nc_template, xy_names[1])
+  values_lat <- ncvar_get(nc_template, xy_names[2])
   nc_close(nc_template)
   
   
@@ -69,7 +70,7 @@ create_emtpy_netcdf <- function(file_template,
   ncatt_put(nc_out, var_out, "standard_name", l_varinfo$standard_name)
   
   # add global attributes
-  ncatt_put(nc_out, 0, "title", "Downscaled RCM data")
+  ncatt_put(nc_out, 0, "title", "Downscaled and/or bias-adjusted RCM data")
   ncatt_put(nc_out, 0, "institution", "DICAM, UniTN, Italy")
   # ncatt_put(nc_out, 0, "source",datasource$value)
   # ncatt_put(nc_out,0,"references",references$value)
