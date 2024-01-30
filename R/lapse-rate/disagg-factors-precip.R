@@ -14,7 +14,7 @@ rs_apgd_obs <- project(rs_apgd, rs)
 rs_apgd_obs_avg <- zonal(rs_apgd_obs, rs_rcm_obs, na.rm = T, as.raster = T)
 rs_frac <- rs_apgd_obs / rs_apgd_obs_avg
 
-rs_frac[is.na(rs)] <- NA
+# rs_frac[is.na(rs)] <- NA
 # rs_frac %>% plot
 
 writeCDF(rs_frac, "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/apgd_precip_disagg_factors.nc")

@@ -22,6 +22,8 @@ ba_variants <- c("qdm", "qm", "mbcn")
 date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
 n_nc_sync <- 200 # intermediate save to nc_out file every n dates
 
+rs_template_tnaa <- rast("/home/climatedata/obs/orography/crespi_lonlat_1km_temperature.nc")
+
 dat_inv <- inv_sub()
 
 # lapse rate data ---------------------------------------------------------
@@ -57,11 +59,12 @@ for(i_ba in ba_variants){
     i_var <- i_file_ba_split[1]
     
     file_rcm_orog <- dat_inv[variable == "orog" & institute_rcm == i_rcm_name, list_files[[1]]]
-    if(i_var == "pr"){
-      file_obs_orog <- "/home/climatedata/obs/orography/crespi_lonlat_1km_precipitation.nc"
-    } else {
-      file_obs_orog <- "/home/climatedata/obs/orography/crespi_lonlat_1km_temperature.nc"
-    }
+    file_obs_orog <- "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc"
+    # if(i_var == "pr"){
+    #   file_obs_orog <- "/home/climatedata/obs/orography/crespi_lonlat_1km_precipitation.nc"
+    # } else {
+    #   file_obs_orog <- "/home/climatedata/obs/orography/crespi_lonlat_1km_temperature.nc"
+    # }
     
     file_out <- path(path_out,
                      str_c("ba-", i_ba, "-ds-lrfix"),
@@ -78,8 +81,8 @@ for(i_ba in ba_variants){
     rs_orog_rcm_obs <- project(rs_rcm_orog, rs_obs_orog, method = "near")
     rs_orog_diff_rcm_obs <- rs_orog_rcm_obs - rs_obs_orog
     
-    cells_obs <- which(!is.na(rs_obs_orog[]))
-    cells_obs_na <- which(is.na(rs_obs_orog[]))
+    cells_obs <- which(!is.na(rs_template_tnaa[]))
+    cells_obs_na <- which(is.na(rs_template_tnaa[]))
     
     rs_rcm <- rast(i_file_ba)
     
@@ -111,17 +114,19 @@ for(i_ba in ba_variants){
       i_month <- month(dates_rcm[i_date])
       i_rcm <- mapped_times[i_date, idx_pcict] # for non-standard cal
       
-      rs_i <- resample(rs_rcm[[i_rcm]], rs_obs_orog, method = "near")
+      rs_i <- unwrap(wrap(rs_rcm[[i_rcm]])) # workaround needed?
+      rs_i_ds <- resample(rs_i, rs_obs_orog, method = "near")
       # rs_cells_rcm_obs[is.na(rs_obs_orog)] <- NA # mask outside TNAA?
       if(i_var == "pr"){
-        rs_i2 <- rs_i * rs_pr_fact[[i_month]]
+        rs_i_ds2 <- rs_i_ds * rs_pr_fact[[i_month]]
       } else {
         i_lr <- dat_lr_fix[vv == i_var & month == i_month, lr]
-        rs_i2 <- rs_i - i_lr*rs_orog_diff_rcm_obs
+        rs_i_ds2 <- rs_i_ds - i_lr*rs_orog_diff_rcm_obs
       }
       
+      rs_i_ds2[cells_obs_na] <- NA
       
-      ncvar_put(nc_out, varid = i_var, vals = values(rs_i2), 
+      ncvar_put(nc_out, varid = i_var, vals = values(rs_i_ds2), 
                 start = c(1, 1, i_date), count = c(-1, -1, 1))
       
       if(i_nc_sync %% n_nc_sync == 0) nc_sync(nc_out)
