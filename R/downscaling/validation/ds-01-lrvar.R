@@ -20,6 +20,7 @@ kk_basis <- 5 # basis for gam (as is for s(orog) and ^2 for s(x,y))
 pr_min_nonzero <- 20 # (precip-only) minimum number of non-zero values to fit 
                      # the gam model (total ncell_rcm = 391); 
                      # if below large-scale values are uniformly replicated
+pr_min_nonzero_th <- 0.1 # threshold (mm) to count actual zeros
 conserve_largescale <- T # ensure large-scale values match sum/means of downscaled values?
 conserve_largescale_cell <- F # conservation at grid cell level (T) or for whole extent (F)
 wrap_gamfit_try <- F # wrap gam fitting proc in try()? -> if T, won't stop for errors, but can produce NA fields
@@ -113,7 +114,7 @@ zz <- foreach(
     i_rcm <- mapped_times[dates_loop[i_date] == dates_full, idx_pcict] # for non-standard cal
     vals_rcm <- mat_rcm[, i_rcm]
     
-    if(i_var == "pr" & length(which(vals_rcm > 0)) < pr_min_nonzero){
+    if(i_var == "pr" & length(which(vals_rcm > pr_min_nonzero_th)) < pr_min_nonzero){
       rs_rcm_i <- rast(rs_rcm_orog)
       rs_rcm_i[] <- vals_rcm
       rs_rcm_i2 <- resample(rs_rcm_i, rs_obs_orog, "near")

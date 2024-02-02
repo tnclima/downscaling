@@ -15,6 +15,7 @@ library(qmap)
 source("R/functions/create_empty_netcdf.R")
 # source("R/functions/get_rcm_values2.R")
 source("R/functions/inv_sub.R")
+source("R/functions/get_nc_1d.R")
 
 # settings - variables ----------------------------------------------------
 
@@ -83,7 +84,7 @@ for(i_ds in ds_variants){
     cells_obs <- which(!is.na(rs_obs_orog[]))
     cells_obs_na <- which(is.na(rs_obs_orog[]))
     
-    rs_rcm <- rast(i_file_ds)
+    # rs_rcm <- rast(i_file_ds)
     # mat_rcm <- values(rs_rcm, mat = T)
     rs_obs <- rast(l_file_obs[[i_var]])
     # if(read_obs_memory) mat_obs <- values(rs_obs, mat = T)
@@ -124,16 +125,17 @@ for(i_ds in ds_variants){
       
       i_nc_sync <- i_nc_sync + 1
       
-      i_row <- rowFromCell(rs_obs, i_cell)
-      i_col <- colFromCell(rs_obs, i_cell)
+      i_row <- rowFromCell(rs_obs_orog, i_cell)
+      i_col <- colFromCell(rs_obs_orog, i_cell)
       # if(read_obs_memory) {
       #   vals_obs <- mat_obs[i_cell, ]
       # } else {
-        vals_obs <- values(rs_obs, mat = F, nrows = 1, ncols = 1,
-                           row = i_row,
-                           col = i_col)
+        # vals_obs <- values(rs_obs, mat = F, nrows = 1, ncols = 1,
+        #                    row = i_row,
+        #                    col = i_col)
       # }
       # elev_obs <- as.vector(rs_obs_orog)[i_cell]
+      vals_obs <-  get_nc_1d(l_file_obs[[i_var]], i_row, i_col)
       
       dat_obs <- data.table(date = dates_obs,
                             year = years_obs,
@@ -144,9 +146,10 @@ for(i_ds in ds_variants){
       dat_obs <- dat_obs[date >= date_rcm_sub[1] & date <= date_rcm_sub[2]]
       
       # vals_rcm <- mat_rcm[i_cell, ]
-      vals_rcm <- values(rs_rcm, mat = F, nrows = 1, ncols = 1,
-                         row = i_row,
-                         col = i_col)
+      # vals_rcm <- values(rs_rcm, mat = F, nrows = 1, ncols = 1,
+      #                    row = i_row,
+      #                    col = i_col)
+      vals_rcm <-  get_nc_1d(i_file_ds, i_row, i_col)
       
       if(i_var == "pr"){
         vals_rcm <- vals_rcm*24*3600
@@ -272,8 +275,8 @@ for(i_ds in ds_variants){
     for(i_cell in cells_obs_na){
       i_nc_sync <- i_nc_sync + 1
       
-      i_row <- rowFromCell(rs_obs, i_cell)
-      i_col <- colFromCell(rs_obs, i_cell)
+      i_row <- rowFromCell(rs_obs_orog, i_cell)
+      i_col <- colFromCell(rs_obs_orog, i_cell)
       
       ncvar_put(nc_out, varid = i_var, vals = rep(NA_real_, nc_out$dim$time$len), 
                 start = c(i_col, i_row, 1), count = c(1, 1, -1))

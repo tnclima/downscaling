@@ -20,7 +20,7 @@ source("R/functions/inv_sub.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv/data-daily/zz_backup/"
+path_out <- "/home/climatedata/downscaling/validation-cv/data-daily/"
 ds_variants <- c("lrvar", "lrfix")
 
 date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
