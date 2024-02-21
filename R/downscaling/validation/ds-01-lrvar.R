@@ -114,7 +114,7 @@ zz <- foreach(
     i_rcm <- mapped_times[dates_loop[i_date] == dates_full, idx_pcict] # for non-standard cal
     vals_rcm <- mat_rcm[, i_rcm]
     
-    if(i_var == "pr" & length(which(vals_rcm > pr_min_nonzero_th)) < pr_min_nonzero){
+    if(i_var == "pr" & length(which(vals_rcm > pr_min_nonzero_th/86400)) < pr_min_nonzero){
       rs_rcm_i <- rast(rs_rcm_orog)
       rs_rcm_i[] <- vals_rcm
       rs_rcm_i2 <- resample(rs_rcm_i, rs_obs_orog, "near")

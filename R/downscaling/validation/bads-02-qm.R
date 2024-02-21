@@ -12,23 +12,26 @@ library(qmap)
 
 source("R/functions/create_empty_netcdf.R")
 source("R/functions/get_rcm_values2.R")
+source("R/functions/get_nc_1d.R")
 source("R/functions/inv_sub.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv/data-daily/bads-qm/"
+path_out <- "/home/climatedata/downscaling/validation-cv/data-daily-v2/bads-qm/"
 
 date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
 l_years_train_period <- list(c(1981,2000), c(2001,2020)) # only two-element vector!
 
 l_wet_day <- list(tasmax = F, tasmin = F, pr = 0.05) # QM: 0.05 for consistency with QDM()
 # l_ratio <- list(tasmax = F, tasmin = F, pr = T) # QDM: ratio in QDM()
-cell_match_type <-  "xy" # elev or xy
-n_cells <- 3 # number of cells for elev, or width (odd) of square for xy
+temp_mv <- F # temporal moving window +-1 month? 
+cell_match_type <-  "xy" # 'elev' or 'xy'
+n_cells <- 1 # number of cells for elev, or width (odd) of square for xy
 detrend <- F # detrend tas*  prior to ba? (and add trend back future)
-read_obs_memory <- F # reduces computation time, increases memory usage (a lot for 1km data!)
+# read_obs_memory <- F # reduces computation time, increases memory usage (a lot for 1km data!)
 n_nc_sync <- 200 # intermediate save to nc_out file every n cells
-  
+n_cores <- 1 # parallel computation; bottleneck maybe disk access?
+
 l_file_obs <- list(
   tasmax = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MaxTemp.nc",
   tasmin = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MinTemp.nc",
@@ -52,7 +55,7 @@ dat_inv_loop <- dat_inv[experiment == "rcp85" &
 
 # main loop ---------------------------------------------------------------
 
-mitmatmisc::init_parallel_ubuntu(6)
+mitmatmisc::init_parallel_ubuntu(n_cores)
 
 zz <- foreach(
   i_inv = 1:nrow(dat_inv_loop),
@@ -91,7 +94,7 @@ zz <- foreach(
   rs_rcm <- rast(file_rcm)
   mat_rcm <- values(rs_rcm, mat = T)
   rs_obs <- rast(l_file_obs[[i_var]])
-  if(read_obs_memory) mat_obs <- values(rs_obs, mat = T)
+  # if(read_obs_memory) mat_obs <- values(rs_obs, mat = T)
   
   dt_rcm_orog <- as.data.table(rs_rcm_orog, xy = T, na.rm = F)
   dt_obs_orog <- as.data.table(rs_obs_orog, xy = T, na.rm = F)
@@ -140,13 +143,8 @@ zz <- foreach(
     
     i_row <- rowFromCell(rs_obs, i_cell)
     i_col <- colFromCell(rs_obs, i_cell)
-    if(read_obs_memory) {
-      vals_obs <- mat_obs[i_cell, ]
-    } else {
-      vals_obs <- values(rs_obs, mat = F, nrows = 1, ncols = 1,
-                         row = i_row,
-                         col = i_col)
-    }
+
+    vals_obs <- get_nc_1d(l_file_obs[[i_var]], i_row, i_col)
     elev_obs <- as.vector(rs_obs_orog)[i_cell]
     
     dat_obs <- data.table(date = dates_obs,
@@ -223,7 +221,12 @@ zz <- foreach(
       
       # moving window correction (+-1 month, +-1 decade)
       for(i_month in 1:12){
-        i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
+        
+        if(temp_mv){
+          i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
+        } else {
+          i_month_window <- i_month 
+        }
         
         vals_train_obs <- dat_obs_hist[month %in% i_month_window][[value_var]]
         vals_train_rcm <- dat_rcm_hist[month %in% i_month_window][[value_var]]

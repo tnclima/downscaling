@@ -17,11 +17,12 @@ library(MBC)
 
 source("R/functions/create_empty_netcdf.R")
 source("R/functions/get_rcm_values2.R")
+# source("R/functions/get_nc_1d.R")
 source("R/functions/inv_sub.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv/data-daily/ba-mbcn/"
+path_out <- "/home/climatedata/downscaling/validation-cv/data-daily-v2/ba-mbcn/"
 
 date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
 l_years_train_period <- list(c(1981,2000), c(2001,2020))
@@ -36,12 +37,14 @@ var_order_ba <- c("tasmax", "tasmin", "pr")
 v_ratio <- c(F, F, T) # as in ?MBC::cccma
 v_trace <- c(Inf, Inf, 0.05) # as in ?MBC::cccma
 
+temp_mv <- F # temporal moving window +-1 month? 
 # cell_match_type <-  "xy" # elev or xy # NOT IMPLEMENTED, fixed xy
 # n_cells <- 1 # number of cells for elev, or width (odd) of square for xy # NOT IMPLEMENTED, fixed 1
 detrend <- F # detrend tas*  prior to ba? (and add trend back future) # NOT TESTED??
 read_obs_memory <- T # reduces computation time, increases memory usage (a lot for 1km data!) # required T
 mbcn_iter <- 15 # iterations of mbcn algorithm (default 30, 10-15 is faster)
 n_nc_sync <- 200 # intermediate save to nc_out file every n cells
+n_cores <- 1 # parallel computation; bottleneck maybe disk access?
 
 l_file_obs <- list(
   tasmax = "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/tasmax_eobs_v26.nc",
@@ -68,7 +71,7 @@ dat_inv_loop_mod <- dat_inv_loop[, .(gcm, institute_rcm, experiment,
   
 # main loop ---------------------------------------------------------------
 
-mitmatmisc::init_parallel_ubuntu(6)
+mitmatmisc::init_parallel_ubuntu(n_cores)
 
 zz <- foreach(
   i_inv = 1:nrow(dat_inv_loop_mod),
@@ -239,7 +242,11 @@ zz <- foreach(
       # moving window correction (+-1 month, +-1 decade)
       for(i_month in 1:12){
         
-        i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
+        if(temp_mv){
+          i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
+        } else {
+          i_month_window <- i_month 
+        }
         
         vals_train_obs <- dat_obs2_hist[month %in% i_month_window & variable %in% var_order_ba] %>%
           dcast(date ~ variable, value.var = melt_value_var) %>% 

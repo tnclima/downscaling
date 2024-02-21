@@ -17,11 +17,12 @@ library(MBC)
 
 source("R/functions/create_empty_netcdf.R")
 source("R/functions/get_rcm_values2.R")
+source("R/functions/get_nc_1d.R")
 source("R/functions/inv_sub.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv/data-daily/bads-mbcn/"
+path_out <- "/home/climatedata/downscaling/validation-cv/data-daily-v2/bads-mbcn/"
 
 date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
 l_years_train_period <- list(c(1981,2000), c(2001,2020))
@@ -36,11 +37,13 @@ var_order_ba <- c("tasmax", "tasmin", "pr")
 v_ratio <- c(F, F, T) # as in ?MBC::cccma
 v_trace <- c(Inf, Inf, 0.05) # as in ?MBC::cccma
 
-cell_match_type <-  "xy" # elev or xy
-n_cells <- 3 # number of cells for elev, or width (odd) of square for xy
+temp_mv <- F # temporal moving window +-1 month? 
+cell_match_type <-  "xy" # 'elev' or 'xy'
+n_cells <- 1 # number of cells for elev, or width (odd) of square for xy
 detrend <- F # detrend tas*  prior to ba? (and add trend back future)
 mbcn_iter <- 15 # iterations of mbcn algorithm (default 30, 10-15 is faster)
 n_nc_sync <- 200 # intermediate save to nc_out file every n cells
+n_cores <- 6 # parallel computation; bottleneck maybe disk access?
 
 l_file_obs <- list(
   tasmax = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MaxTemp.nc",
@@ -67,7 +70,7 @@ dat_inv_loop_mod <- dat_inv_loop[, .(gcm, institute_rcm, experiment,
   
 # main loop ---------------------------------------------------------------
 
-mitmatmisc::init_parallel_ubuntu(6)
+mitmatmisc::init_parallel_ubuntu(n_cores)
 
 zz <- foreach(
   i_inv = 1:nrow(dat_inv_loop_mod),
@@ -154,9 +157,8 @@ zz <- foreach(
     
     i_row <- rowFromCell(l_rs_obs$tasmax, i_cell)
     i_col <- colFromCell(l_rs_obs$tasmax, i_cell)
-    l_vals_obs <- map(l_rs_obs, \(rs_obs) values(
-      rs_obs, mat = F, nrows = 1, ncols = 1, row = i_row, col = i_col
-    ))
+ 
+    l_vals_obs <- map(l_file_obs[var_order], \(x) get_nc_1d(x, i_row, i_col))
     elev_obs <- rss_obs_orog[][i_cell, ]
     
     dat_obs <- data.table(date = dates_obs,
@@ -250,7 +252,11 @@ zz <- foreach(
       # moving window correction (+-1 month, +-1 decade)
       for(i_month in 1:12){
         
-        i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
+        if(temp_mv){
+          i_month_window <- c(12,1:12,1)[1 + i_month+c(-1:1)]
+        } else {
+          i_month_window <- i_month 
+        }
         
         vals_train_obs <- dat_obs2_hist[month %in% i_month_window & variable %in% var_order_ba] %>%
           dcast(date ~ variable, value.var = melt_value_var) %>% 
