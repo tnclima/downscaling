@@ -1,4 +1,4 @@
-# compare BA then DS
+# 
 
 library(eurocordexr)
 library(lubridate)
@@ -14,9 +14,14 @@ library(foreach)
 source("R/functions/snowfall.R")
 
 path_in <- "/home/climatedata/downscaling/validation-cv/data-daily/"
-ba_variants <- c("qm", "qdm", "mbcn")
+path_out <- "/home/climatedata/downscaling/validation-cv/rdata-summary/eval-ds-then-ba/"
+dir_create(path_out)
+
+# ba_variants <- c("qm", "qdm", "mbcn")
+ba_variants <- c("mbcn")
 ds_variants <- c("lrfix", "lrvar")
 l_years_train_period <- list(c(1981,2000), c(2001,2020))
+pctl <- c(0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1)
 
 l_file_obs <- list(
   tasmax = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MaxTemp.nc",
@@ -28,15 +33,15 @@ foreach(i_years = l_years_train_period) %do% {
   
   date_range <- c(str_c(i_years[1], "-01-01"), str_c(i_years[2], "-12-31"))
   
-  dat_pr <- nc_grid_to_dt(l_file_obs[["pr"]], date_range = date_range)
+  dat_pr <- nc_grid_to_dt(l_file_obs[["pr"]], date_range = date_range, icell_raster_pkg = F)
   setnames(dat_pr, 3, "pr")
   dat_pr <- dat_pr[!is.na(pr)]
   
-  dat_tasmin <- nc_grid_to_dt(l_file_obs[["tasmin"]], date_range = date_range)
+  dat_tasmin <- nc_grid_to_dt(l_file_obs[["tasmin"]], date_range = date_range, icell_raster_pkg = F)
   setnames(dat_tasmin, 3, "tasmin")
   dat_tasmin <- dat_tasmin[!is.na(tasmin)]
   
-  dat_tasmax <- nc_grid_to_dt(l_file_obs[["tasmax"]], date_range = date_range)
+  dat_tasmax <- nc_grid_to_dt(l_file_obs[["tasmax"]], date_range = date_range, icell_raster_pkg = F)
   setnames(dat_tasmax, 3, "tasmax")
   dat_tasmax <- dat_tasmax[!is.na(tasmax)]
   
@@ -60,21 +65,21 @@ foreach(i_years = l_years_train_period) %do% {
     
     foreach(i_ds = ds_variants) %do% {
       
-      files_bads <- dir_ls(path(path_in, str_c("ba-", i_ba, "-ds-", i_ds)))
+      files_bads <- dir_ls(path(path_in, str_c("ds-", i_ds, "-ba-", i_ba)))
       
       foreach(i_centers = 1:6) %do% {
         
         files_read <- str_subset(files_bads, str_c("_", i_centers, "_"))
         
-        dat_pr <- nc_grid_to_dt(str_subset(files_read, "pr"), date_range = date_range)
+        dat_pr <- nc_grid_to_dt(str_subset(files_read, "pr"), date_range = date_range, icell_raster_pkg = F)
         setnames(dat_pr, 3, "pr")
         dat_pr <- dat_pr[!is.na(pr)]
         
-        dat_tasmin <- nc_grid_to_dt(str_subset(files_read, "tasmin"), date_range = date_range)
+        dat_tasmin <- nc_grid_to_dt(str_subset(files_read, "tasmin"), date_range = date_range, icell_raster_pkg = F)
         setnames(dat_tasmin, 3, "tasmin")
         dat_tasmin <- dat_tasmin[!is.na(tasmin)]
         
-        dat_tasmax <- nc_grid_to_dt(str_subset(files_read, "tasmax"), date_range = date_range)
+        dat_tasmax <- nc_grid_to_dt(str_subset(files_read, "tasmax"), date_range = date_range, icell_raster_pkg = F)
         setnames(dat_tasmax, 3, "tasmax")
         dat_tasmax <- dat_tasmax[!is.na(tasmax)]
         
@@ -99,9 +104,8 @@ foreach(i_years = l_years_train_period) %do% {
           dat_merge <- merge(dat_i_long_sub, dat_ref_long_sub)
           
           dat_summ <- dat_merge[, 
-                                c(map2(mitmatmisc::calc_pctl(value, 0:10/10),
-                                       mitmatmisc::calc_pctl(value_ref, 0:10/10),
-                                       \(x,y) x - y),
+                                c(mitmatmisc::calc_pctl(value, pctl),
+                                  mitmatmisc::calc_pctl(value_ref, pctl, prefix = "ref_p"),
                                   mean_value = mean(value),
                                   mean_value_ref = mean(value_ref),
                                   # bias = mean(value) - mean(value_ref),
@@ -119,7 +123,7 @@ foreach(i_years = l_years_train_period) %do% {
           
         }
         
-        file_out <- path("/home/climatedata/downscaling/validation-cv/rdata-summary/eval-ba-then-ds/",
+        file_out <- path(path_out,
                          str_c(str_c(i_years, collapse = "-"),
                                i_ba, i_ds, i_centers, sep = "_"),
                          ext = "rds")
