@@ -17,10 +17,12 @@ source("R/functions/inv_sub.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv/data-daily-v2/bads-qm/"
+path_out <- "/home/climatedata/downscaling/validation-cv/data-daily-v3/bads-qm/"
 
 date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
-l_years_train_period <- list(c(1981,2000), c(2001,2020)) # only two-element vector!
+# l_years_train_period <- list(c(1981:2000), c(2001:2020))
+l_years_train_period <- list(c(1981+0:19*2), c(1981+0:19*2+1))
+
 
 l_wet_day <- list(tasmax = F, tasmin = F, pr = 0.05) # QM: 0.05 for consistency with QDM()
 # l_ratio <- list(tasmax = F, tasmin = F, pr = T) # QDM: ratio in QDM()
@@ -181,7 +183,7 @@ zz <- foreach(
     
     for(years_train_period in l_years_train_period){
       
-      dat_obs_hist <- dat_obs[year >= years_train_period[1] & year <= years_train_period[2]]
+      dat_obs_hist <- dat_obs[year %in% years_train_period]
      
       if(detrend & i_var != "pr"){
         dat_obs_hist[, year0 := year - min(year)]
@@ -196,8 +198,7 @@ zz <- foreach(
         #   facet_wrap(~month_fct)
       }
       
-      dat_rcm_hist <- dat_rcm[year >= years_train_period[1] & 
-                                year <= years_train_period[2]] %>% 
+      dat_rcm_hist <- dat_rcm[year %in% years_train_period] %>% 
         melt(id.vars = c("year", "month"), measure.vars = patterns("^V"))
       
       if(detrend & i_var != "pr"){
@@ -234,7 +235,7 @@ zz <- foreach(
         
         dat_rcm_fut_window <- dat_rcm[month %in% i_month_window & 
                                         # decade %in% i_decade_window &
-                                        !between(year, years_train_period[1], years_train_period[2])] %>% 
+                                        !year %in% years_train_period] %>% 
           melt(id.vars = c("year", "decade", "month"), 
                measure.vars = patterns("^V"))
         
@@ -268,7 +269,7 @@ zz <- foreach(
         # update only month and decade in the middle (not moving)
         # dat_rcm[month == i_month & decade == i_decade, 
         #         value_ba := dat_rcm_fut_window[month == i_month & decade == i_decade, value_qdm]]
-        dat_rcm[month == i_month & !between(year, years_train_period[1], years_train_period[2]), 
+        dat_rcm[month == i_month & !year %in% years_train_period, 
                 value_ba := dat_rcm_fut_window[month == i_month & variable == "V1", value_ba]]
         
       }

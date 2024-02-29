@@ -22,10 +22,11 @@ source("R/functions/inv_sub.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv/data-daily-v2/bads-mbcn/"
+path_out <- "/home/climatedata/downscaling/validation-cv/data-daily-v3/bads-mbcn/"
 
 date_rcm_sub <- as.Date(c("1981-01-01", "2020-12-31"))
-l_years_train_period <- list(c(1981,2000), c(2001,2020))
+# l_years_train_period <- list(c(1981:2000), c(2001:2020))
+l_years_train_period <- list(c(1981+0:19*2), c(1981+0:19*2+1))
 
 var_order <- c("tasmax", "tasmin", "pr")
 # v1
@@ -200,7 +201,7 @@ zz <- foreach(
     
     for(years_train_period in l_years_train_period){
       
-      dat_obs2_hist <- dat_obs2[year >= years_train_period[1] & year <= years_train_period[2]]
+      dat_obs2_hist <- dat_obs2[year %in% years_train_period]
       
       if(detrend){
         dat_obs2_hist[, year0 := year - min(year)]
@@ -221,8 +222,7 @@ zz <- foreach(
         # ggsave(sprintf("fig/test-mbcn/crespi-%i.png", i_cell), width = 20, height = 8)
       }
       
-      dat_rcm_hist <- dat_rcm[year >= years_train_period[1] & 
-                                year <= years_train_period[2]] %>% 
+      dat_rcm_hist <- dat_rcm[year %in% years_train_period] %>% 
         melt(id.vars = c("date", "year", "month", "variable"),
              measure.vars = patterns("^V"),
              variable.name = "cell")
@@ -274,7 +274,7 @@ zz <- foreach(
           # detrend future
           dat_rcm_fut_window <- dat_rcm[month %in% i_month_window  &
                                           # decade %in% i_decade_window & 
-                                          !between(year, years_train_period[1], years_train_period[2])] %>% 
+                                          !year %in% years_train_period] %>% 
             melt(id.vars = c("date", "year", "decade", "month", "variable"), 
                  measure.vars = patterns("^V"),
                  variable.name = "cell")
@@ -323,7 +323,7 @@ zz <- foreach(
           # update only month and decade in the middle (not moving)
           walk(var_order_ba, \(i_var){
             dat_rcm[month == i_month & 
-                      !between(year, years_train_period[1], years_train_period[2]) &
+                      !year %in% years_train_period &
                       variable == i_var, 
                     value_ba := dat_rcm_fut_window3[cell == "V1" & month == i_month &
                                                       variable == i_var,
