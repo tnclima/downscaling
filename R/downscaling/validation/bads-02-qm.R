@@ -254,9 +254,8 @@ zz <- foreach(
           #   facet_grid(variable~month)
         }
 
-        vals_future_rcm <- dat_rcm_fut_window[
-          month == i_month & variable == "V1" & 
-            !between(year, years_train_period[1], years_train_period[2])][[value_var]]
+        vals_future_rcm <- dat_rcm_fut_window[month == i_month & variable == "V1" & 
+                                                ! year %in% years_train_period][[value_var]]
         vals_future_rcm_qm <- doQmapQUANT(vals_future_rcm, qm_fit, type = "linear")
         
         dat_rcm_fut_window[variable == "V1" & month == i_month, 

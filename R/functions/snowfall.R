@@ -4,7 +4,7 @@
 
 snowfall <- function(pr, tasmax, tasmin, th = 2){
   out <- pr
-  out[tasmin > th] <- 0
+  out[tasmin >= th] <- 0
   # out[tasmax <= th]
   lgl_mix <- tasmax > th & tasmin < th
   if(any(lgl_mix)){
