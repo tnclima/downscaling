@@ -25,14 +25,15 @@ path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v
 ba_variants <- c("qdm", "mbcn")
 
 date_rcm_sub <- as.Date(c("1989-01-02", "2008-12-31"))
-l_years_train_period <- readRDS("data/random-years-reanalysis.rds")
+# l_years_train_period <- readRDS("data/random-years-reanalysis.rds")
+l_years_train_period <- readRDS("data/random-years-reanalysis2.rds")
 
 # l_wet_day <- list(tasmax = F, tasmin = F, pr = 0.05) # QM: 0.05 for consistency with QDM()
 l_ratio <- list(tasmax = F, tasmin = F, pr = T) # QDM: ratio in QDM()
 
 temp_mv <- F # temporal moving window +-1 month? 
 n_nc_sync <- 200 # intermediate save to nc_out file every n cells
-n_cores <- 1 # parallel computation; bottleneck maybe disk access; (reads RCM memory, crespi cell-by-cell)
+n_cores <- 4 # parallel computation; bottleneck maybe disk access; (reads RCM memory, crespi cell-by-cell)
 
 upscaled_crespi <- T # needed info, because different NA cells at boundaries
 
@@ -78,7 +79,7 @@ for(i_ba in ba_variants){
     file_obs_orog <- l_file_obs_orog[[i_var]]
     
     file_out <- path(path_out,
-                     str_c("ba-", i_ba, "-ds-qdm"),
+                     str_c("ba-", i_ba, "-ds-qdm2"),
                      path_file(i_file_ba))
     
     
