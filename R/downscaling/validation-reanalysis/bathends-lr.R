@@ -20,7 +20,8 @@ ba_variants <- c("qdm", "mbcn")
 
 date_rcm_sub <- as.Date(c("1989-01-02", "2008-12-31"))
 n_nc_sync <- 200 # intermediate save to nc_out file every n dates
-n_cores <- 1 # parallel computation; bottleneck maybe disk access; (reads RCM layer-by-layer, no need for crespi)
+n_cores <- 3 # parallel computation; bottleneck maybe disk access; (reads RCM layer-by-layer, no need for crespi)
+ref_orog_rcm <- F # if T, reference orography raw RCM (good if no BA), if F upscaled Crespi (good if BA first)
 
 rs_template_tnaa <- rast("/home/climatedata/obs/orography/crespi_lonlat_1km_temperature.nc")
 
@@ -55,7 +56,17 @@ for(i_ba in ba_variants){
     i_rcm_name <- i_file_ba_split[2]
     i_var <- i_file_ba_split[1]
     
-    file_rcm_orog <- dat_inv[variable == "orog" & institute_rcm == i_rcm_name, list_files[[1]]]
+    if(ref_orog_rcm){
+      file_rcm_orog <- dat_inv[variable == "orog" & institute_rcm == i_rcm_name, list_files[[1]]]
+    } else {
+      if(i_var == "pr"){
+        file_rcm_orog <- "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_crespi_precipitation.nc"
+      } else {
+        file_rcm_orog <- "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_crespi_temperature.nc"
+      }
+    }
+    
+    
     # file_obs_orog <- "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc"
     if(i_var == "pr"){
       file_obs_orog <- "/home/climatedata/obs/orography/crespi_lonlat_1km_precipitation.nc"
