@@ -70,13 +70,16 @@ create_emtpy_netcdf <- function(file_template,
   ncatt_put(nc_out, var_out, "standard_name", l_varinfo$standard_name)
   
   # add global attributes
-  ncatt_put(nc_out, 0, "title", "Downscaled and/or bias-adjusted RCM data")
-  ncatt_put(nc_out, 0, "institution", "DICAM, UniTN, Italy")
+  ncatt_put(nc_out, 0, "title", "Downscaled and bias-adjusted RCM data with quantile delta mapping")
+  ncatt_put(nc_out, 0, "institution", "DICAM, University of Trento, Italy")
   # ncatt_put(nc_out, 0, "source",datasource$value)
   # ncatt_put(nc_out,0,"references",references$value)
   history <- paste("M. Matiu", date(), sep=", ")
   ncatt_put(nc_out, 0, "history", history)
   ncatt_put(nc_out, 0, "Conventions", "CF-1.4")
+  ncatt_put(nc_out, 0, "License", "CC-BY-4.0")
+  ncatt_put(nc_out, 0, "Disclaimer_IT", "I dati sono forniti ``così come sono'' e gli autori non sono responsabili di alcuna conseguenze derivante dall'uso dei dati.")
+  ncatt_put(nc_out, 0, "Disclaimer_EN", 'Data is provided "as-is" and the authors are not liable for any consequence that arises from using the data.')
   
   # Get a summary of the created file:
   # nc_out
