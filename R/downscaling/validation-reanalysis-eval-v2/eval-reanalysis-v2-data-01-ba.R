@@ -31,7 +31,7 @@ source("R/functions/etccdi.R")
 # settings ----------------------------------------------------------------
 
 lgl_crespi <- F # F to skip, save time
-lgl_raw <- F # F to skip, save time
+lgl_raw <- T # F to skip, save time
 
 path_in <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v2/"
 ba_variants <- c("qdm", "mbcn")
@@ -269,7 +269,7 @@ foreach(i = 1:nrow(dat_inv_loop_mod)) %do% {
                       .(date, season, elev_fct),
                       .SDcols = c("pr", "hn", "tasmax", "tasmin")]
   
-  dat_i <- merge(dat_i, dat_crespi, by = c("icell", "date", "season", "elev_fct"))
+  dat_i <- merge(dat_i, dat_crespi[, -c("elev_fct")], by = c("icell", "date", "season"))
   dat_i_tnaa <- merge(dat_i_tnaa, dat_crespi_tnaa)
   dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
   
@@ -467,7 +467,7 @@ for(i_ba in ba_variants){
     #                     l_raw_elev[[i_rcm_name]] %>% 
     #                       dplyr::rename_with(~str_c(.x, "_raw"), c(pr, tasmin, tasmax, hn)))
     
-    dat_i <- merge(dat_i, dat_crespi, by = c("icell", "date", "season", "elev_fct"))
+    dat_i <- merge(dat_i, dat_crespi[, -c("elev_fct")], by = c("icell", "date", "season"))
     dat_i_tnaa <- merge(dat_i_tnaa, dat_crespi_tnaa)
     dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
     
@@ -504,7 +504,9 @@ for(i_ba in ba_variants){
       
     }) %>% rbindlist      
     
-    
+    dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, -1)]
+    dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, -1)]
+    dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
     dat_i_tnaa_out6 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
       dat_i_tnaa[, 
                  .(mae = mean(abs(value - value_crespi)),
@@ -557,6 +559,9 @@ for(i_ba in ba_variants){
       
     }) %>% rbindlist     
     
+    dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, -1), .(elev_fct)]
+    dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, -1), .(elev_fct)]
+    dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
     dat_i_elev_out6 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
       dat_i_elev[, 
                  .(mae = mean(abs(value - value_crespi)),
@@ -620,6 +625,9 @@ for(i_ba in ba_variants){
             .(season, date)]
     }) %>% rbindlist
     
+    dat_i[, pr_crespi := data.table::shift(pr_crespi, -1), .(icell)]
+    dat_i[, hn_crespi := data.table::shift(hn_crespi, -1), .(icell)]
+    dat_i <- dat_i[!is.na(pr_crespi)]
     dat_i_icell_out6 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
       dat_i[, 
             .(mae = mean(abs(value - value_crespi)),

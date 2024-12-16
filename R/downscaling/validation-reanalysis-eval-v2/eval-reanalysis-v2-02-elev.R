@@ -211,6 +211,8 @@ dat_plot <- dat_ba[!bads %in% c("ba-qdm", "ba-mbcn")] %>%
     "ds-pcalm" = "ba-mbcn-ds-pcalm",
     "ds-qdm" = "ba-qdm-ds-qdm",
     "ds-qdm" = "ba-mbcn-ds-qdm",
+    "ds-qdm2" = "ba-qdm-ds-qdm2",
+    "ds-qdm2" = "ba-mbcn-ds-qdm2",
     "ds-gam" = "ba-qdm-ds-gam",
     "ds-gam" = "ba-mbcn-ds-gam",
     "ds-lr" = "ba-qdm-ds-lr",
@@ -336,12 +338,13 @@ for(i_dist_test in unique(dat_plot$dist_test)){
     if(i_var %in% c("tasmin", "tasmax")){
       
       gg <- dat_plot[dist_test == i_dist_test & variable == i_var] %>% 
-        ggplot(aes(bads, dist_stat, fill = elev_fct))+
+        ggplot(aes(elev_fct, dist_stat, fill = bads))+
         geom_boxplot()+
-        scale_fill_brewer()+
+        scale_fill_brewer(palette = "Set1")+
         facet_wrap(~ season, scales = "free_y")+
         # facet_grid(elev_fct ~ season, scales = "free_y")+
         theme_bw()+
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
         ggtitle(str_c(i_dist_test, i_var, sep = " / "))
       
       ggsave(fn_out, gg, width = 12, height = 6)
@@ -351,12 +354,13 @@ for(i_dist_test in unique(dat_plot$dist_test)){
     if(i_var %in% c("pr", "hn")){
       
       gg <- dat_plot[dist_test == i_dist_test & variable == i_var] %>% 
-        ggplot(aes(bads, dist_stat, fill = elev_fct))+
+        ggplot(aes(elev_fct, dist_stat, fill = bads))+
         geom_boxplot()+
-        scale_fill_brewer()+
+        scale_fill_brewer(palette = "Set1")+
         facet_wrap(~ season, scales = "free_y")+
         # facet_grid(elev_fct ~ season, scales = "free_y")+
         theme_bw()+
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
         ggtitle(str_c(i_dist_test, i_var, sep = " / "))
       
       ggsave(fn_out, gg, width = 12, height = 6)
@@ -381,6 +385,8 @@ dat_plot <- dat_ba[!bads %in% c("ba-mbcn", "ba-qdm")] %>%
     "ds-pcalm" = "ba-mbcn-ds-pcalm",
     "ds-qdm" = "ba-qdm-ds-qdm",
     "ds-qdm" = "ba-mbcn-ds-qdm",
+    "ds-qdm2" = "ba-qdm-ds-qdm2",
+    "ds-qdm2" = "ba-mbcn-ds-qdm2",
     "ds-gam" = "ba-qdm-ds-gam",
     "ds-gam" = "ba-mbcn-ds-gam",
     "ds-lr" = "ba-qdm-ds-lr",
@@ -394,47 +400,138 @@ dat_plot[, pval_sig := pval < 0.05]
 
 for(i_dist_test in unique(dat_plot$dist_test)){
   
-  
   for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     
-    fn_out <- path("fig/validation-eval-reanalysis/elev/dist-stat/",
-                   str_c(i_dist_test, i_var, sep = "-"),
-                   ext = "png")
-    
-    if(i_var %in% c("tasmin", "tasmax")){
+    for(i_seas in levels(dat_plot$season)){
       
-      gg <- dat_plot[bads_multi == F & dist_test == i_dist_test & variable == i_var & bads_ds != "ds-gam"] %>% 
-        ggplot(aes(bads_ds, dist_stat, fill = elev_fct))+
+      fn_out <- path("fig/validation-eval-reanalysis/elev/dist-stat/",
+                     str_c(i_dist_test, i_var, i_seas, sep = "-"),
+                     ext = "png")
+      
+      
+      gg <- dat_plot[dist_test == i_dist_test & variable == i_var & season == i_seas & bads_ds != "ds-gam"] %>% 
+        ggplot(aes(bads_ds, dist_stat, linetype = bads_multi))+
         geom_boxplot()+
-        scale_fill_brewer()+
-        facet_wrap(~ season, scales = "free_y")+
+        # scale_fill_brewer(palette = "Set1")+
+        facet_wrap(~ elev_fct, scales = "free_y")+
         # facet_grid(elev_fct ~ season, scales = "free_y")+
         theme_bw()+
-        ggtitle(str_c(i_dist_test, i_var, sep = " / "))
-      
-      ggsave(fn_out, gg, width = 12, height = 6)
-      
-    }
-    
-    if(i_var %in% c("pr", "hn")){
-      
-      gg <- dat_plot[dist_test == i_dist_test & variable == i_var] %>% 
-        ggplot(aes(bads_ds, dist_stat, fill = elev_fct, linetype = bads_multi))+
-        geom_boxplot()+
-        scale_fill_brewer()+
-        facet_wrap(~ season, scales = "free_y")+
-        # facet_grid(elev_fct ~ season, scales = "free_y")+
-        theme_bw()+
+        # theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
         ggtitle(str_c(i_dist_test, i_var, sep = " / "))
       
       ggsave(fn_out, gg, width = 16, height = 8)
       
+      
+      
     }
-    
-    
-    
     
   }
   
 }
+
+
+
+
+# metrics -----------------------------------------------------------------
+
+
+dat_raw <- map(
+  dir_ls("/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v2/elev/metrics/raw"),
+  \(x){
+    rcm <- x %>% path_file %>% path_ext_remove
+    readRDS(x) %>% 
+      cbind(institute_rcm = rcm)
+  }
+) %>% rbindlist()
+
+
+
+dat_ba <- map(
+  dir_ls("/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v2/elev/metrics/", glob = "*/ba*"),
+  \(path_ba){
+    map(dir_ls(path_ba),
+        \(x){
+          rcm <- x %>% path_file %>% path_ext_remove
+          readRDS(x) %>% 
+            cbind(institute_rcm = rcm)
+        }) %>% rbindlist(fill = T) %>% cbind(bads = path_file(path_ba))
+  }
+) %>% rbindlist(fill = T)
+
+
+# ** ba -----------------------------------------------------------------
+
+dat_plot <-  rbind(
+  dat_raw %>% cbind(bads = "raw"),
+  dat_ba[bads %in% c("ba-qdm", "ba-mbcn")]
+) %>% 
+  melt(measure.vars = c("mae", "bias", "corr"), variable.name = "metric")
+
+for(i_var in c("tasmin", "tasmax", "pr", "hn")){
+  
+  fn_out <- path("fig/validation-eval-reanalysis/elev-ba/metrics-raw/",
+                 i_var,
+                 ext = "png")
+  
+  gg <-
+    dat_plot[variable == i_var] %>% 
+    ggplot(aes(elev_fct, value, fill = bads))+
+    geom_boxplot()+
+    scale_fill_brewer(palette = "Set1")+
+    facet_grid(metric ~ season, scales = "free_y")+
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
+    ggtitle(i_var)
+  
+  ggsave(fn_out, gg, width = 13, height = 6)
+  
+}
+
+
+
+# ** bads -----------------------------------------------------------------
+
+
+dat_plot <- dat_ba[!bads %in% c("ba-qdm", "ba-mbcn")] %>% 
+  .[, bads_multi := str_detect(bads, "mbcn")] %>% 
+  .[, bads_ds := bads %>% forcats::fct_recode(
+    "ds-pcalm" = "ba-qdm-ds-pcalm",
+    "ds-pcalm" = "ba-mbcn-ds-pcalm",
+    "ds-qdm" = "ba-qdm-ds-qdm",
+    "ds-qdm" = "ba-mbcn-ds-qdm",
+    "ds-qdm2" = "ba-qdm-ds-qdm2",
+    "ds-qdm2" = "ba-mbcn-ds-qdm2",
+    "ds-gam" = "ba-qdm-ds-gam",
+    "ds-gam" = "ba-mbcn-ds-gam",
+    "ds-lr" = "ba-qdm-ds-lr",
+    "ds-lr" = "ba-mbcn-ds-lr",
+    "bads" = "bads-qdm",
+    "bads" = "bads-mbcn"   
+  )] %>% 
+  melt(measure.vars = c("mae", "bias", "corr"), variable.name = "metric")
+
+
+
+
+for(i_var in c("tasmin", "tasmax", "pr", "hn")){
+  
+  for(i_seas in levels(dat_plot$season)){
+    
+    fn_out <- path("fig/validation-eval-reanalysis/elev/metrics/",
+                   str_c(i_var, i_seas, sep = "-"),
+                   ext = "png")
+    
+    gg <-
+      dat_plot[variable == i_var & season == i_seas & bads_ds != "ds-gam"] %>% 
+      ggplot(aes(bads_ds, value, linetype = bads_multi))+
+      geom_boxplot()+
+      facet_grid(metric ~ elev_fct, scales = "free_y")+
+      theme_bw()+
+      ggtitle(i_var)
+    
+    ggsave(fn_out, gg, width = 18, height = 6)
+    
+  }
+}
+
 

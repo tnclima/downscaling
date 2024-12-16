@@ -16,6 +16,8 @@ library(foreach)
 source("R/functions/inv_sub_reanalysis.R")
 source("R/functions/snowfall.R")
 
+lgl_do_ba <- F # F to save time
+
 dat_aux <- nc_grid_to_dt("/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc",
                                       add_xy = T)
 dat_aux <- dat_aux[!is.na(orog), .(icell, x = longitude, y = latitude, orog)]
@@ -52,7 +54,8 @@ dat_inv_loop <- dat_inv[variable %in% c("tasmin", "tasmax", "pr")]
 dat_inv_loop_mod <- dat_inv_loop[, .(gcm, institute_rcm, experiment, 
                                      ensemble, downscale_realisation)] %>% unique()
 
-# ba ----------------------------------------------------------------------
+
+# helper fun --------------------------------------------------------------
 
 f_read <- function(l_files, date1 = i_date1, date2 = i_date2, raw = F){
   
@@ -99,73 +102,81 @@ f_read <- function(l_files, date1 = i_date1, date2 = i_date2, raw = F){
 files_ba_qdm <- dir_ls(path(path_in, "ba-qdm"))
 files_ba_mbcn <- dir_ls(path(path_in, "ba-mbcn"))
 
-# for(i in seq_along(date_loop)){
-for(i_week in 1:52){
-  
-  i_date1 <- min(date_loop[week(date_loop) == i_week])
-  i_date2 <- max(date_loop[week(date_loop) == i_week])
-  
-  for(i_rcm in 1:nrow(dat_inv_loop_mod)){
-    
-    i_rcm_name <- dat_inv_loop_mod[i_rcm, institute_rcm]
-    
-    # raw
-    l_files <- dat_inv_loop[institute_rcm == i_rcm_name, list_files]
-    names(l_files) <- dat_inv_loop[institute_rcm == i_rcm_name, variable]
-    dat_raw <- f_read(l_files, raw = T)
 
-    # crespi
-    dat_crespi <- f_read(l_file_crespi_011)
-    
-    # qdm
-    l_files <- str_subset(files_ba_qdm, fixed(i_rcm_name)) %>% sort %>% as.list
-    names(l_files) <- c("pr", "tasmax", "tasmin")
-    dat_qdm <- f_read(l_files)
-    
-    # mbcn
-    l_files <- str_subset(files_ba_mbcn, fixed(i_rcm_name)) %>% sort %>% as.list
-    names(l_files) <- c("pr", "tasmax", "tasmin")
-    dat_mbcn <- f_read(l_files)
-    
-    dat_plot <- rbind(
-      cbind(dat_crespi, ff = "crespi_011"),
-      cbind(dat_raw, ff = "raw"),
-      cbind(dat_qdm, ff = "qdm"),
-      cbind(dat_mbcn, ff = "mbcn")
-    )
-    dat_plot[, ff_fct := fct_inorder(ff)]
-    
-    dat_plot <- dat_plot[icell %in% dat_crespi$icell]
-  
-    for(i_var in c("pr", "tasmin", "tasmax", "hn")){
-      
-      fn_out <- path("fig/validation-eval-reanalysis/ts-maps-ba/",
-                     i_rcm_name,
-                     str_c(i_var, "_week", sprintf("%02i", i_week)),
-                     ext = "png")
+# ba ----------------------------------------------------------------------
 
-      if(file_exists(fn_out)) next
-            
-      gg <- dat_plot %>% 
-        merge(dat_aux_011) %>% 
-        ggplot(aes(lon, lat, fill = !!sym(i_var)))+
-        geom_raster()+
-        scale_fill_viridis_c()+
-        facet_grid(ff_fct ~ date)+
-        theme_bw()+
-        coord_fixed()+
-        xlab(NULL)+ylab(NULL)
+if(lgl_do_ba){
+  
+ 
+  # for(i in seq_along(date_loop)){
+  for(i_week in 1:52){
+    
+    i_date1 <- min(date_loop[week(date_loop) == i_week])
+    i_date2 <- max(date_loop[week(date_loop) == i_week])
+    
+    for(i_rcm in 1:nrow(dat_inv_loop_mod)){
       
-      ggsave(fn_out, gg, width = 12, height = 5)
+      i_rcm_name <- dat_inv_loop_mod[i_rcm, institute_rcm]
+      
+      # raw
+      l_files <- dat_inv_loop[institute_rcm == i_rcm_name, list_files]
+      names(l_files) <- dat_inv_loop[institute_rcm == i_rcm_name, variable]
+      dat_raw <- f_read(l_files, raw = T)
+      
+      # crespi
+      dat_crespi <- f_read(l_file_crespi_011)
+      
+      # qdm
+      l_files <- str_subset(files_ba_qdm, fixed(i_rcm_name)) %>% sort %>% as.list
+      names(l_files) <- c("pr", "tasmax", "tasmin")
+      dat_qdm <- f_read(l_files)
+      
+      # mbcn
+      l_files <- str_subset(files_ba_mbcn, fixed(i_rcm_name)) %>% sort %>% as.list
+      names(l_files) <- c("pr", "tasmax", "tasmin")
+      dat_mbcn <- f_read(l_files)
+      
+      dat_plot <- rbind(
+        cbind(dat_crespi, ff = "crespi_011"),
+        cbind(dat_raw, ff = "raw"),
+        cbind(dat_qdm, ff = "qdm"),
+        cbind(dat_mbcn, ff = "mbcn")
+      )
+      dat_plot[, ff_fct := fct_inorder(ff)]
+      
+      dat_plot <- dat_plot[icell %in% dat_crespi$icell]
+      
+      for(i_var in c("pr", "tasmin", "tasmax", "hn")){
+        
+        fn_out <- path("fig/validation-eval-reanalysis/ts-maps-ba/",
+                       i_rcm_name,
+                       str_c(i_var, "_week", sprintf("%02i", i_week)),
+                       ext = "png")
+        
+        if(file_exists(fn_out)) next
+        
+        gg <- dat_plot %>% 
+          merge(dat_aux_011) %>% 
+          ggplot(aes(lon, lat, fill = !!sym(i_var)))+
+          geom_raster()+
+          scale_fill_viridis_c()+
+          facet_grid(ff_fct ~ date)+
+          theme_bw()+
+          coord_fixed()+
+          xlab(NULL)+ylab(NULL)
+        
+        ggsave(fn_out, gg, width = 12, height = 5)
+        
+      }
       
     }
-  
+    
   }
   
+  
+  
+  
 }
-
-
-
 
 
 # bads --------------------------------------------------------------------
@@ -183,6 +194,8 @@ for(i in seq_along(date_loop)){
   
   # crespi
   dat_crespi <- f_read(l_file_crespi, i_date, i_date)
+  # crespi day+1 for pr and hn
+  dat_crespi1 <- f_read(l_file_crespi, i_date + 1, i_date + 1)
   
   for(i_rcm in 1:nrow(dat_inv_loop_mod)){
     
@@ -242,6 +255,8 @@ for(i in seq_along(date_loop)){
       "ds-pcalm" = "ba-mbcn-ds-pcalm",
       "ds-qdm" = "ba-qdm-ds-qdm",
       "ds-qdm" = "ba-mbcn-ds-qdm",
+      "ds-qdm2" = "ba-qdm-ds-qdm2",
+      "ds-qdm2" = "ba-mbcn-ds-qdm2",
       "ds-gam" = "ba-qdm-ds-gam",
       "ds-gam" = "ba-mbcn-ds-gam",
       "ds-lr" = "ba-qdm-ds-lr",
@@ -259,7 +274,10 @@ for(i in seq_along(date_loop)){
       
       if(file_exists(fn_out)) next
       
-      lims_col <- range(dat_bads[[i_var]], dat_plot_011[[i_var]], dat_crespi[[i_var]],
+      dat_plot_crespi <- if(i_var %in%  c("tasmin", "tasmax")) dat_crespi else dat_crespi1
+      lbl_suffix <- if(i_var %in%  c("tasmin", "tasmax")) "" else " (day+1)"
+      
+      lims_col <- range(dat_bads[[i_var]], dat_plot_011[[i_var]], dat_plot_crespi[[i_var]],
                         na.rm = T)
       
       gg_bads <- dat_bads %>% 
@@ -283,12 +301,13 @@ for(i in seq_along(date_loop)){
         coord_fixed()+
         xlab(NULL)+ylab(NULL)
       
-      gg_crespi <- dat_crespi %>% 
+      
+      gg_crespi <- dat_plot_crespi %>% 
         merge(dat_aux) %>% 
         ggplot(aes(x, y, fill = !!sym(i_var)))+
         geom_raster()+
         scale_fill_viridis_c(limits = lims_col)+
-        facet_grid(. ~ "crespi")+
+        facet_grid(. ~ str_c("crespi", lbl_suffix))+
         theme_bw()+
         coord_fixed()+
         xlab(NULL)+ylab(NULL)
@@ -296,7 +315,7 @@ for(i in seq_along(date_loop)){
       gg_out <- wrap_plots(gg_crespi, gg_011, nrow = 1, widths = c(1,3)) %>% 
         wrap_plots(gg_bads, ncol = 1, heights = c(1,2))
       
-      ggsave(fn_out, gg_out, width = 12, height = 6)
+      ggsave(fn_out, gg_out, width = 14, height = 6)
     }
     
   }
