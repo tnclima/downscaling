@@ -6,10 +6,11 @@ setDTthreads(4)
 library(magrittr)
 
 inv_sub <- function(
-    path_ds ="/home/climatedata/downscaling/rcm_lonlat_tnaa/"
+    path_ds ="/home/climatedata/downscaling/rcm_lonlat_tnaa/",
+    file_kkz = "data/sub-ensemble-kkz-tn-01-selected-models.rds"
 ){
   
-  dat_kkz <- readRDS("data/sub-ensemble-kkz-01-selected-models.rds")
+  dat_kkz <- readRDS(file_kkz)
   dat_inv <- get_inventory(path_ds)
   dat_inv[variable == "orog" & institute_rcm == "UHOH-WRF361H", 
           institute_rcm := "IPSL-WRF381P"] # since wrf381 has no fx info
