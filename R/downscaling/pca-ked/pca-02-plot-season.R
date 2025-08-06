@@ -13,7 +13,7 @@ library(forcats)
 library(stringr)
 
 nn <- "1000"
-suffix <- "centerFALSE-scaleTRUE"
+suffix <- "centerTRUE-scaleTRUE"
 
 dat_aux <- nc_grid_to_dt("/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc", add_xy = T)
 dat_aux <- dat_aux[, .(icell, x = longitude, y = latitude, orog)]
@@ -138,3 +138,9 @@ dat_expvar %>%
 ggsave(str_c("fig/pca-ked/pca-results/season", nn, "-expvar-", suffix, ".png"),
        width = 12, height = 4)
 
+
+dat_expvar[pc_num == 1 & variable == "pr"] %>% summary
+dat_expvar[pc_num == 1 & variable != "pr"] %>% summary
+
+dat_expvar[pc_num == 2 & variable == "pr"] %>% summary
+dat_expvar[pc_num == 3 & variable == "pr"] %>% summary

@@ -463,3 +463,104 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
 }
 
 
+
+
+
+# spatcor -----------------------------------------------------------------
+
+
+dat_raw <- map(
+  dir_ls("/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v2/tnaa/spatcor/raw/"),
+  \(x){
+    rcm <- x %>% path_file %>% path_ext_remove
+    readRDS(x) %>% 
+      cbind(institute_rcm = rcm)
+  }
+) %>% rbindlist()
+
+
+
+dat_ba <- map(
+  dir_ls("/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v2/tnaa/spatcor/", glob = "*/ba*"),
+  \(path_ba){
+    map(dir_ls(path_ba),
+        \(x){
+          rcm <- x %>% path_file %>% path_ext_remove
+          readRDS(x) %>% 
+            cbind(institute_rcm = rcm)
+        }) %>% rbindlist(fill = T) %>% cbind(bads = path_file(path_ba))
+  }
+) %>% rbindlist(fill = T)
+
+
+# ** ba -----------------------------------------------------------------
+
+dat_plot <-  rbind(
+  dat_raw %>% cbind(bads = "raw"),
+  dat_ba[bads %in% c("ba-qdm", "ba-mbcn")]
+) %>% 
+  melt(measure.vars = c("spatcor", "spatcor_nonzero"), variable.name = "spatcor")
+
+for(i_var in c("tasmin", "tasmax", "pr", "hn")){
+  
+  fn_out <- path("fig/validation-eval-reanalysis/tnaa-ba/spatcor-raw/",
+                 i_var,
+                 ext = "png")
+  
+  gg <-
+    dat_plot[variable == i_var] %>% 
+    ggplot(aes(bads, value))+
+    geom_boxplot()+
+    facet_grid(spatcor ~ season, scales = "free_y")+
+    theme_bw()+
+    ggtitle(i_var)
+  
+  ggsave(fn_out, gg, width = 9, height = 6)
+  
+}
+
+
+
+# ** bads -----------------------------------------------------------------
+
+
+dat_plot <- dat_ba[!bads %in% c("ba-qdm", "ba-mbcn")] %>% 
+  .[, bads_multi := str_detect(bads, "mbcn")] %>% 
+  .[, bads_ds := bads %>% forcats::fct_recode(
+    "ds-pcalm" = "ba-qdm-ds-pcalm",
+    "ds-pcalm" = "ba-mbcn-ds-pcalm",
+    "ds-qdm" = "ba-qdm-ds-qdm",
+    "ds-qdm" = "ba-mbcn-ds-qdm",
+    "ds-qdm2" = "ba-qdm-ds-qdm2",
+    "ds-qdm2" = "ba-mbcn-ds-qdm2",
+    "ds-gam" = "ba-qdm-ds-gam",
+    "ds-gam" = "ba-mbcn-ds-gam",
+    "ds-lr" = "ba-qdm-ds-lr",
+    "ds-lr" = "ba-mbcn-ds-lr",
+    "bads" = "bads-qdm",
+    "bads" = "bads-mbcn"   
+  )] %>% 
+  melt(measure.vars = c("spatcor", "spatcor_nonzero"), variable.name = "spatcor")
+
+
+
+
+for(i_var in c("tasmin", "tasmax", "pr", "hn")){
+  
+  fn_out <- path("fig/validation-eval-reanalysis/tnaa/spatcor/",
+                 i_var,
+                 ext = "png")
+  
+  gg <-
+    dat_plot[variable == i_var] %>% 
+    ggplot(aes(bads_ds, value, linetype = bads_multi))+
+    geom_boxplot()+
+    facet_grid(spatcor ~ season, scales = "free_y")+
+    theme_bw()+
+    ggtitle(i_var)
+  
+  ggsave(fn_out, gg, width = 16, height = 6)
+  
+}
+
+

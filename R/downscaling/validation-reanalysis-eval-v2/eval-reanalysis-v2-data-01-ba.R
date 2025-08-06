@@ -89,18 +89,19 @@ icell_common <- intersect(dat1[!is.na(pr), icell], dat2[!is.na(pr), icell])
 
 # spatcor fun -------------------------------------------------------------
 
-
-# template raster for autocor
-rr_template <- rast(file_orog)
-
-f_autocor <- function(dat, cl){
-  # if(all(dat[[cl]] == 0, na.rm = T)) return(data.table())
-  rr0 <- rast(rr_template)
-  rr0[dat$icell] <- dat[[cl]]
-  rr0[!(1:ncell(rr0) %in% icell_common)] <- NA
-  data.table(morani = autocor(rr0, method = "moran"),
-             gearyc = autocor(rr0, method = "geary"))
-}
+# not make sense, use simple cor instead
+# 
+# # template raster for autocor
+# rr_template <- rast(file_orog)
+# 
+# f_autocor <- function(dat, cl){
+#   # if(all(dat[[cl]] == 0, na.rm = T)) return(data.table())
+#   rr0 <- rast(rr_template)
+#   rr0[dat$icell] <- dat[[cl]]
+#   rr0[!(1:ncell(rr0) %in% icell_common)] <- NA
+#   data.table(morani = autocor(rr0, method = "moran"),
+#              gearyc = autocor(rr0, method = "geary"))
+# }
 
 
 # crespi data -------------------------------------------------------------
@@ -193,11 +194,11 @@ if(lgl_crespi){
     mitmatmisc::calc_pctl(tasmax_crespi, pctl_tas, "tasmax_crespi_p")
   ), .(season, icell)]
   
-  dat_crespi_icell_out5 <- map(str_c(c("pr", "tasmin", "tasmax", "hn"), "_crespi"), \(x){
-    dat_crespi[, 
-               c(f_autocor(.SD, x), variable = x), 
-               .(season, date)]
-  }) %>% rbindlist
+  # dat_crespi_icell_out5 <- map(str_c(c("pr", "tasmin", "tasmax", "hn"), "_crespi"), \(x){
+  #   dat_crespi[, 
+  #              c(f_autocor(.SD, x), variable = x), 
+  #              .(season, date)]
+  # }) %>% rbindlist
   
   # save
   saveRDS(dat_crespi_tnaa_out1, path(path_out, "tnaa", "mean-pctl", "crespi-011.rds"))
@@ -205,7 +206,7 @@ if(lgl_crespi){
   saveRDS(dat_crespi_elev_out1, path(path_out, "elev", "mean-pctl", "crespi-011.rds"))
   saveRDS(dat_crespi_elev_out2, path(path_out, "elev", "ecdf", "crespi-011.rds"))
   saveRDS(dat_crespi_icell_out1, path(path_out, "icell", "mean-pctl", "crespi-011.rds"))
-  saveRDS(dat_crespi_icell_out5, path(path_out, "icell", "spatcor", "crespi-011.rds"))
+  # saveRDS(dat_crespi_icell_out5, path(path_out, "icell", "spatcor", "crespi-011.rds"))
   
   
 }
@@ -214,9 +215,9 @@ if(lgl_crespi){
 
 # loop raw --------------------------------------------------------------------
 
-dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "metrics"), "raw"))
+dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "metrics", "spatcor"), "raw"))
 dir_create(path(path_out, "elev", c("mean-pctl", "ecdf", "metrics"), "raw"))
-dir_create(path(path_out, "icell", c("mean-pctl", "etccdi", "spatcor", "metrics"), "raw"))
+dir_create(path(path_out, "icell", c("mean-pctl", "etccdi", "metrics"), "raw"))
 
 l_raw <- list()
 l_raw_tnaa <- list()
@@ -273,6 +274,18 @@ foreach(i = 1:nrow(dat_inv_loop_mod)) %do% {
   dat_i_tnaa <- merge(dat_i_tnaa, dat_crespi_tnaa)
   dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
   
+  dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, -1)]
+  dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, -1)]
+  dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
+  
+  dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, -1), .(elev_fct)]
+  dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, -1), .(elev_fct)]
+  dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
+  
+  dat_i[, pr_crespi := data.table::shift(pr_crespi, -1), .(icell)]
+  dat_i[, hn_crespi := data.table::shift(hn_crespi, -1), .(icell)]
+  dat_i <- dat_i[!is.na(pr_crespi)]
+  
   # ** tnaa --------------------------------------------------------------------
   
   dat_i_tnaa_out1 <- dat_i_tnaa[, c(
@@ -297,15 +310,32 @@ foreach(i = 1:nrow(dat_inv_loop_mod)) %do% {
     dat_i_tnaa[, 
                .(mae = mean(abs(value - value_crespi)),
                  bias = mean(value - value_crespi),
+                 bias_rel = mean(value - value_crespi)/mean(value_crespi),
                  corr = cor(value, value_crespi),
                  variable = x),
                .(season),
                env = list(value = x, value_crespi = str_c(x, "_crespi"))]
   }) %>% rbindlist   
   
+  
+  dat_i_tnaa_out7 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
+    dat_i[, 
+          .(spatcor = suppressWarnings(cor(value, value_crespi)),
+            spatcor_nonzero = cor(value[value > 0 & value_crespi > 0], 
+                                   value_crespi[value > 0 & value_crespi > 0]),
+            variable = x),
+          .(season, date),
+          env = list(value = x, value_crespi = str_c(x, "_crespi"))] %>% 
+      .[,
+        .(spatcor = mean(spatcor, na.rm = T),
+          spatcor_nonzero = mean(spatcor_nonzero, na.rm = T)),
+        .(season, variable)]
+  }) %>% rbindlist   
+  
   saveRDS(dat_i_tnaa_out1, path(path_out, "tnaa", "mean-pctl", "raw", i_rcm_name, ext = "rds"))
   saveRDS(dat_i_tnaa_out2, path(path_out, "tnaa", "ecdf", "raw", i_rcm_name, ext = "rds"))
   saveRDS(dat_i_tnaa_out6, path(path_out, "tnaa", "metrics", "raw", i_rcm_name, ext = "rds"))
+  saveRDS(dat_i_tnaa_out7, path(path_out, "tnaa", "spatcor", "raw", i_rcm_name, ext = "rds"))
   
   
   
@@ -334,6 +364,7 @@ foreach(i = 1:nrow(dat_inv_loop_mod)) %do% {
     dat_i_elev[, 
                .(mae = mean(abs(value - value_crespi)),
                  bias = mean(value - value_crespi),
+                 bias_rel = mean(value - value_crespi)/mean(value_crespi),
                  corr = cor(value, value_crespi),
                  variable = x),
                .(season, elev_fct),
@@ -371,16 +402,17 @@ foreach(i = 1:nrow(dat_inv_loop_mod)) %do% {
         .[, .(value = mean(val), variable = ind), .(icell)]
     }) %>% rbindlist
   
-  dat_i_icell_out5 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
-    dat_i[, 
-          c(f_autocor(.SD, x), variable = x), 
-          .(season, date)]
-  }) %>% rbindlist
+  # dat_i_icell_out5 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
+  #   dat_i[, 
+  #         c(f_autocor(.SD, x), variable = x), 
+  #         .(season, date)]
+  # }) %>% rbindlist
   
   dat_i_icell_out6 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
     dat_i[, 
           .(mae = mean(abs(value - value_crespi)),
             bias = mean(value - value_crespi),
+            bias_rel = mean(value - value_crespi)/mean(value_crespi),
             corr = cor(value, value_crespi),
             variable = x),
           .(season, icell),
@@ -389,7 +421,7 @@ foreach(i = 1:nrow(dat_inv_loop_mod)) %do% {
   
   saveRDS(dat_i_icell_out1, path(path_out, "icell", "mean-pctl", "raw", i_rcm_name, ext = "rds"))
   saveRDS(dat_i_icell_out4, path(path_out, "icell", "etccdi", "raw", i_rcm_name, ext = "rds"))
-  saveRDS(dat_i_icell_out5, path(path_out, "icell", "spatcor", "raw", i_rcm_name, ext = "rds"))
+  # saveRDS(dat_i_icell_out5, path(path_out, "icell", "spatcor", "raw", i_rcm_name, ext = "rds"))
   saveRDS(dat_i_icell_out6, path(path_out, "icell", "metrics", "raw", i_rcm_name, ext = "rds"))
   
   l_raw[[i_rcm_name]] <- dat_i
@@ -410,9 +442,9 @@ for(i_ba in ba_variants){
   
   files_ba <- dir_ls(path(path_in, str_c("ba-", i_ba)))
   
-  dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics"),str_c("ba-", i_ba)))
+  dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics", "spatcor"),str_c("ba-", i_ba)))
   dir_create(path(path_out, "elev", c("mean-pctl", "ecdf", "dist-stat", "metrics"), str_c("ba-", i_ba)))
-  dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "spatcor", "metrics"), str_c("ba-", i_ba)))
+  dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "metrics"), str_c("ba-", i_ba)))
     
   for(i in 1:nrow(dat_inv_loop_mod)){
     
@@ -471,6 +503,18 @@ for(i_ba in ba_variants){
     dat_i_tnaa <- merge(dat_i_tnaa, dat_crespi_tnaa)
     dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
     
+    dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, -1)]
+    dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, -1)]
+    dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
+    
+    dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, -1), .(elev_fct)]
+    dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, -1), .(elev_fct)]
+    dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
+    
+    dat_i[, pr_crespi := data.table::shift(pr_crespi, -1), .(icell)]
+    dat_i[, hn_crespi := data.table::shift(hn_crespi, -1), .(icell)]
+    dat_i <- dat_i[!is.na(pr_crespi)]
+    
     # ** tnaa --------------------------------------------------------------------
     
     dat_i_tnaa_out1 <- dat_i_tnaa[, c(
@@ -504,13 +548,11 @@ for(i_ba in ba_variants){
       
     }) %>% rbindlist      
     
-    dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, -1)]
-    dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, -1)]
-    dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
     dat_i_tnaa_out6 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
       dat_i_tnaa[, 
                  .(mae = mean(abs(value - value_crespi)),
                    bias = mean(value - value_crespi),
+                   bias_rel = mean(value - value_crespi)/mean(value_crespi),
                    corr = cor(value, value_crespi),
                    variable = x),
                  .(season),
@@ -518,11 +560,25 @@ for(i_ba in ba_variants){
     }) %>% rbindlist   
     
     
+    dat_i_tnaa_out7 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
+      dat_i[, 
+            .(spatcor = suppressWarnings(cor(value, value_crespi)),
+              spatcor_nonzero = cor(value[value > 0 & value_crespi > 0], 
+                                    value_crespi[value > 0 & value_crespi > 0]),
+              variable = x),
+            .(season, date),
+            env = list(value = x, value_crespi = str_c(x, "_crespi"))] %>% 
+        .[,
+          .(spatcor = mean(spatcor, na.rm = T),
+            spatcor_nonzero = mean(spatcor_nonzero, na.rm = T)),
+          .(season, variable)]
+    }) %>% rbindlist   
+    
     saveRDS(dat_i_tnaa_out1, path(path_out, "tnaa", "mean-pctl", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     saveRDS(dat_i_tnaa_out2, path(path_out, "tnaa", "ecdf", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     saveRDS(dat_i_tnaa_out3, path(path_out, "tnaa", "dist-stat", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     saveRDS(dat_i_tnaa_out6, path(path_out, "tnaa", "metrics", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
-    
+    saveRDS(dat_i_tnaa_out7, path(path_out, "tnaa", "spatcor", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     
     
     # ** elev --------------------------------------------------------------------
@@ -559,13 +615,11 @@ for(i_ba in ba_variants){
       
     }) %>% rbindlist     
     
-    dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, -1), .(elev_fct)]
-    dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, -1), .(elev_fct)]
-    dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
     dat_i_elev_out6 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
       dat_i_elev[, 
                  .(mae = mean(abs(value - value_crespi)),
                    bias = mean(value - value_crespi),
+                   bias_rel = mean(value - value_crespi)/mean(value_crespi),
                    corr = cor(value, value_crespi),
                    variable = x),
                  .(season, elev_fct),
@@ -619,19 +673,17 @@ for(i_ba in ba_variants){
       }) %>% rbindlist
     
     
-    dat_i_icell_out5 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
-      dat_i[, 
-            c(f_autocor(.SD, x), variable = x), 
-            .(season, date)]
-    }) %>% rbindlist
+    # dat_i_icell_out5 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
+    #   dat_i[, 
+    #         c(f_autocor(.SD, x), variable = x), 
+    #         .(season, date)]
+    # }) %>% rbindlist
     
-    dat_i[, pr_crespi := data.table::shift(pr_crespi, -1), .(icell)]
-    dat_i[, hn_crespi := data.table::shift(hn_crespi, -1), .(icell)]
-    dat_i <- dat_i[!is.na(pr_crespi)]
     dat_i_icell_out6 <- map(c("pr", "tasmin", "tasmax", "hn"), \(x){
       dat_i[, 
             .(mae = mean(abs(value - value_crespi)),
               bias = mean(value - value_crespi),
+              bias_rel = mean(value - value_crespi)/mean(value_crespi),
               corr = cor(value, value_crespi),
               variable = x),
             .(season, icell),
@@ -641,7 +693,7 @@ for(i_ba in ba_variants){
     saveRDS(dat_i_icell_out1, path(path_out, "icell", "mean-pctl", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     # saveRDS(dat_i_icell_out3, path(path_out, "icell", "dist-stat", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     saveRDS(dat_i_icell_out4, path(path_out, "icell", "etccdi", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
-    saveRDS(dat_i_icell_out5, path(path_out, "icell", "spatcor", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
+    # saveRDS(dat_i_icell_out5, path(path_out, "icell", "spatcor", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     saveRDS(dat_i_icell_out6, path(path_out, "icell", "metrics", str_c("ba-", i_ba), i_rcm_name, ext = "rds"))
     
     

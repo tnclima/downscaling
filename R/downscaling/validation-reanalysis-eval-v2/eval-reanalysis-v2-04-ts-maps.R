@@ -17,13 +17,15 @@ source("R/functions/inv_sub_reanalysis.R")
 source("R/functions/snowfall.R")
 
 lgl_do_ba <- F # F to save time
+lgl_do_bads <- F # F to save time
+lgl_do_obs_pcalm <- F # F to save time
 
 dat_aux <- nc_grid_to_dt("/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc",
-                                      add_xy = T)
+                         add_xy = T)
 dat_aux <- dat_aux[!is.na(orog), .(icell, x = longitude, y = latitude, orog)]
 
 dat_aux_011 <- nc_grid_to_dt("/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eobs.nc",
-                                          add_xy = T)
+                             add_xy = T)
 dat_aux_011[, date := NULL]
 
 date_sub <- c("2003-01-01", "2003-12-31") %>% as.Date
@@ -107,7 +109,7 @@ files_ba_mbcn <- dir_ls(path(path_in, "ba-mbcn"))
 
 if(lgl_do_ba){
   
- 
+  
   # for(i in seq_along(date_loop)){
   for(i_week in 1:52){
     
@@ -181,141 +183,145 @@ if(lgl_do_ba){
 
 # bads --------------------------------------------------------------------
 
-path_bads <- dir_ls(path_in) %>%
-  str_subset("ba-qdm$", negate = T) %>%
-  str_subset("ba-mbcn$", negate = T) %>% 
-  c(dir_ls(path_in_v1) %>% str_subset("bads"))
-
-
-
-for(i in seq_along(date_loop)){
+if(lgl_do_bads){
   
-  i_date <- date_loop[i]
+  path_bads <- dir_ls(path_in) %>%
+    str_subset("ba-qdm$", negate = T) %>%
+    str_subset("ba-mbcn$", negate = T) %>% 
+    c(dir_ls(path_in_v1) %>% str_subset("bads"))
   
-  # crespi
-  dat_crespi <- f_read(l_file_crespi, i_date, i_date)
-  # crespi day+1 for pr and hn
-  dat_crespi1 <- f_read(l_file_crespi, i_date + 1, i_date + 1)
   
-  for(i_rcm in 1:nrow(dat_inv_loop_mod)){
+  
+  for(i in seq_along(date_loop)){
     
-    i_rcm_name <- dat_inv_loop_mod[i_rcm, institute_rcm]
-
-    # raw
-    l_files <- dat_inv_loop[institute_rcm == i_rcm_name, list_files]
-    names(l_files) <- dat_inv_loop[institute_rcm == i_rcm_name, variable]
-    dat_raw <- f_read(l_files, i_date, i_date, raw = T)
+    i_date <- date_loop[i]
     
-    # qdm
-    l_files <- str_subset(files_ba_qdm, fixed(i_rcm_name)) %>% sort %>% as.list
-    names(l_files) <- c("pr", "tasmax", "tasmin")
-    dat_qdm <- f_read(l_files, i_date, i_date)
+    # crespi
+    dat_crespi <- f_read(l_file_crespi, i_date, i_date)
+    # crespi day+1 for pr and hn
+    dat_crespi1 <- f_read(l_file_crespi, i_date + 1, i_date + 1)
     
-    # mbcn
-    l_files <- str_subset(files_ba_mbcn, fixed(i_rcm_name)) %>% sort %>% as.list
-    names(l_files) <- c("pr", "tasmax", "tasmin")
-    dat_mbcn <- f_read(l_files, i_date, i_date)
-    
-    dat_plot_011 <- rbind(
-      cbind(dat_raw, ff = "raw"),
-      cbind(dat_qdm, ff = "qdm"),
-      cbind(dat_mbcn, ff = "mbcn")
-    )
-    dat_plot_011[, ff_fct := fct_inorder(ff)]
-    
-    dat_plot_011 <- dat_plot_011[icell %in% dat_qdm$icell]
-    
-    # bads
-    dat_bads <- foreach(i_path = path_bads) %do% {
+    for(i_rcm in 1:nrow(dat_inv_loop_mod)){
       
-      files_bads <- dir_ls(i_path)
-      i_bads <- path_file(i_path)
+      i_rcm_name <- dat_inv_loop_mod[i_rcm, institute_rcm]
       
-      files_read <- str_subset(files_bads, fixed(i_rcm_name)) %>% sort %>% as.list
+      # raw
+      l_files <- dat_inv_loop[institute_rcm == i_rcm_name, list_files]
+      names(l_files) <- dat_inv_loop[institute_rcm == i_rcm_name, variable]
+      dat_raw <- f_read(l_files, i_date, i_date, raw = T)
       
-      if(length(files_read) == 2){
-        # no pr
-        names(files_read) <- c("tasmax", "tasmin")
-        dat_i <- f_read(files_read, i_date, i_date)
+      # qdm
+      l_files <- str_subset(files_ba_qdm, fixed(i_rcm_name)) %>% sort %>% as.list
+      names(l_files) <- c("pr", "tasmax", "tasmin")
+      dat_qdm <- f_read(l_files, i_date, i_date)
+      
+      # mbcn
+      l_files <- str_subset(files_ba_mbcn, fixed(i_rcm_name)) %>% sort %>% as.list
+      names(l_files) <- c("pr", "tasmax", "tasmin")
+      dat_mbcn <- f_read(l_files, i_date, i_date)
+      
+      dat_plot_011 <- rbind(
+        cbind(dat_raw, ff = "raw"),
+        cbind(dat_qdm, ff = "qdm"),
+        cbind(dat_mbcn, ff = "mbcn")
+      )
+      dat_plot_011[, ff_fct := fct_inorder(ff)]
+      
+      dat_plot_011 <- dat_plot_011[icell %in% dat_qdm$icell]
+      
+      # bads
+      dat_bads <- foreach(i_path = path_bads) %do% {
         
-      } else {
-        # with pr
-        names(files_read) <- c("pr", "tasmax", "tasmin")
-        dat_i <- f_read(files_read, i_date, i_date)
+        files_bads <- dir_ls(i_path)
+        i_bads <- path_file(i_path)
         
+        files_read <- str_subset(files_bads, fixed(i_rcm_name)) %>% sort %>% as.list
+        
+        if(length(files_read) == 2){
+          # no pr
+          names(files_read) <- c("tasmax", "tasmin")
+          dat_i <- f_read(files_read, i_date, i_date)
+          
+        } else {
+          # with pr
+          names(files_read) <- c("pr", "tasmax", "tasmin")
+          dat_i <- f_read(files_read, i_date, i_date)
+          
+        }
+        
+        cbind(dat_i, bads = i_bads)
+      } %>% rbindlist(fill = T)
+      
+      dat_bads[, bads_multi := str_detect(bads, "mbcn")]
+      dat_bads[, bads_multi_chr := ifelse(bads_multi, "multi", "uni")]
+      dat_bads[, bads_ds := bads %>% forcats::fct_recode(
+        "ds-pcalm" = "ba-qdm-ds-pcalm",
+        "ds-pcalm" = "ba-mbcn-ds-pcalm",
+        "ds-qdm" = "ba-qdm-ds-qdm",
+        "ds-qdm" = "ba-mbcn-ds-qdm",
+        "ds-qdm2" = "ba-qdm-ds-qdm2",
+        "ds-qdm2" = "ba-mbcn-ds-qdm2",
+        "ds-gam" = "ba-qdm-ds-gam",
+        "ds-gam" = "ba-mbcn-ds-gam",
+        "ds-lr" = "ba-qdm-ds-lr",
+        "ds-lr" = "ba-mbcn-ds-lr",
+        "bads" = "bads-qdm",
+        "bads" = "bads-mbcn"   
+      )]
+      
+      for(i_var in c("pr", "tasmin", "tasmax", "hn")){
+        
+        fn_out <- path("fig/validation-eval-reanalysis/ts-maps/",
+                       i_rcm_name,
+                       str_c(i_var, i_date, sep = "_"),
+                       ext = "png")
+        
+        if(file_exists(fn_out)) next
+        
+        dat_plot_crespi <- if(i_var %in%  c("tasmin", "tasmax")) dat_crespi else dat_crespi1
+        lbl_suffix <- if(i_var %in%  c("tasmin", "tasmax")) "" else " (day+1)"
+        
+        lims_col <- range(dat_bads[[i_var]], dat_plot_011[[i_var]], dat_plot_crespi[[i_var]],
+                          na.rm = T)
+        
+        gg_bads <- dat_bads %>% 
+          merge(dat_aux) %>% 
+          ggplot(aes(x, y, fill = !!sym(i_var)))+
+          geom_raster()+
+          scale_fill_viridis_c(limits = lims_col)+
+          facet_grid(bads_multi_chr ~ bads_ds)+
+          theme_bw()+
+          coord_fixed()+
+          xlab(NULL)+ylab(NULL)
+        
+        gg_011 <- 
+          dat_plot_011 %>% 
+          merge(dat_aux_011) %>% 
+          ggplot(aes(lon, lat, fill = !!sym(i_var)))+
+          geom_raster()+
+          scale_fill_viridis_c(limits = lims_col)+
+          facet_grid(. ~ ff)+
+          theme_bw()+
+          coord_fixed()+
+          xlab(NULL)+ylab(NULL)
+        
+        
+        gg_crespi <- dat_plot_crespi %>% 
+          merge(dat_aux) %>% 
+          ggplot(aes(x, y, fill = !!sym(i_var)))+
+          geom_raster()+
+          scale_fill_viridis_c(limits = lims_col)+
+          facet_grid(. ~ str_c("crespi", lbl_suffix))+
+          theme_bw()+
+          coord_fixed()+
+          xlab(NULL)+ylab(NULL)
+        
+        gg_out <- wrap_plots(gg_crespi, gg_011, nrow = 1, widths = c(1,3)) %>% 
+          wrap_plots(gg_bads, ncol = 1, heights = c(1,2))
+        
+        ggsave(fn_out, gg_out, width = 14, height = 6)
       }
       
-      cbind(dat_i, bads = i_bads)
-    } %>% rbindlist(fill = T)
-    
-    dat_bads[, bads_multi := str_detect(bads, "mbcn")]
-    dat_bads[, bads_multi_chr := ifelse(bads_multi, "multi", "uni")]
-    dat_bads[, bads_ds := bads %>% forcats::fct_recode(
-      "ds-pcalm" = "ba-qdm-ds-pcalm",
-      "ds-pcalm" = "ba-mbcn-ds-pcalm",
-      "ds-qdm" = "ba-qdm-ds-qdm",
-      "ds-qdm" = "ba-mbcn-ds-qdm",
-      "ds-qdm2" = "ba-qdm-ds-qdm2",
-      "ds-qdm2" = "ba-mbcn-ds-qdm2",
-      "ds-gam" = "ba-qdm-ds-gam",
-      "ds-gam" = "ba-mbcn-ds-gam",
-      "ds-lr" = "ba-qdm-ds-lr",
-      "ds-lr" = "ba-mbcn-ds-lr",
-      "bads" = "bads-qdm",
-      "bads" = "bads-mbcn"   
-    )]
-    
-    for(i_var in c("pr", "tasmin", "tasmax", "hn")){
-      
-      fn_out <- path("fig/validation-eval-reanalysis/ts-maps/",
-                     i_rcm_name,
-                     str_c(i_var, i_date, sep = "_"),
-                     ext = "png")
-      
-      if(file_exists(fn_out)) next
-      
-      dat_plot_crespi <- if(i_var %in%  c("tasmin", "tasmax")) dat_crespi else dat_crespi1
-      lbl_suffix <- if(i_var %in%  c("tasmin", "tasmax")) "" else " (day+1)"
-      
-      lims_col <- range(dat_bads[[i_var]], dat_plot_011[[i_var]], dat_plot_crespi[[i_var]],
-                        na.rm = T)
-      
-      gg_bads <- dat_bads %>% 
-        merge(dat_aux) %>% 
-        ggplot(aes(x, y, fill = !!sym(i_var)))+
-        geom_raster()+
-        scale_fill_viridis_c(limits = lims_col)+
-        facet_grid(bads_multi_chr ~ bads_ds)+
-        theme_bw()+
-        coord_fixed()+
-        xlab(NULL)+ylab(NULL)
-      
-      gg_011 <- 
-        dat_plot_011 %>% 
-        merge(dat_aux_011) %>% 
-        ggplot(aes(lon, lat, fill = !!sym(i_var)))+
-        geom_raster()+
-        scale_fill_viridis_c(limits = lims_col)+
-        facet_grid(. ~ ff)+
-        theme_bw()+
-        coord_fixed()+
-        xlab(NULL)+ylab(NULL)
-      
-      
-      gg_crespi <- dat_plot_crespi %>% 
-        merge(dat_aux) %>% 
-        ggplot(aes(x, y, fill = !!sym(i_var)))+
-        geom_raster()+
-        scale_fill_viridis_c(limits = lims_col)+
-        facet_grid(. ~ str_c("crespi", lbl_suffix))+
-        theme_bw()+
-        coord_fixed()+
-        xlab(NULL)+ylab(NULL)
-      
-      gg_out <- wrap_plots(gg_crespi, gg_011, nrow = 1, widths = c(1,3)) %>% 
-        wrap_plots(gg_bads, ncol = 1, heights = c(1,2))
-      
-      ggsave(fn_out, gg_out, width = 14, height = 6)
     }
     
   }
@@ -323,7 +329,107 @@ for(i in seq_along(date_loop)){
 }
 
 
+# obs-pcalm ---------------------------------------------------------------
 
 
+if(lgl_do_obs_pcalm){
+  
+  
+  # for(i in seq_along(date_loop)){
+  for(i_week in 1:52){
+    
+    i_date1 <- min(date_loop[week(date_loop) == i_week])
+    i_date2 <- max(date_loop[week(date_loop) == i_week])
+    
+    
+    # crespi 011
+    dat_crespi_011 <- f_read(l_file_crespi_011)
+    
+    # crespi 1km
+    dat_crespi <- f_read(l_file_crespi)
+    
+    # ds pcalm
+    l_files <- dir_ls("/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v3/obs-ds-pcalm2/")
+    l_files %>% 
+      path_file() %>% 
+      path_ext_remove() %>% 
+      str_split_i("_", 1)-> names(l_files)
+    
+    dat_ds <- f_read(as.list(l_files))
+ 
+    for(i_var in c("pr", "tasmin", "tasmax", "hn")){
+      
+      fn_out <- path("fig/validation-eval-reanalysis/ts-maps-obs-dspcalm2/",
+                     str_c(i_var, "_week", sprintf("%02i", i_week)),
+                     ext = "png")
+      
+      if(file_exists(fn_out)) next
+      
+      lims_col <- range(dat_ds[[i_var]], dat_crespi_011[[i_var]], dat_crespi[[i_var]],
+                        na.rm = T)
+      
+      gg_ds <- dat_ds %>% 
+        merge(dat_aux) %>% 
+        ggplot(aes(x, y, fill = !!sym(i_var)))+
+        geom_raster()+
+        scale_fill_viridis_c(limits = lims_col)+
+        facet_grid("ds-pcalm" ~ date)+
+        theme_bw()+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      gg_011 <- 
+        dat_crespi_011 %>% 
+        merge(dat_aux_011) %>% 
+        ggplot(aes(lon, lat, fill = !!sym(i_var)))+
+        geom_raster()+
+        scale_fill_viridis_c(limits = lims_col)+
+        facet_grid("0.11°" ~ date)+
+        theme_bw()+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      
+      gg_crespi <- dat_crespi %>% 
+        merge(dat_aux) %>% 
+        ggplot(aes(x, y, fill = !!sym(i_var)))+
+        geom_raster()+
+        scale_fill_viridis_c(limits = lims_col)+
+        facet_grid("1km" ~ date)+
+        theme_bw()+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      dat1 <- dat_ds[, c("icell", "date", i_var), with = F]
+      setnames(dat1, i_var, "value_ds")
+      dat2 <- dat_crespi[, c("icell", "date", i_var), with = F]
+      setnames(dat2, i_var, "value_obs")
+      dat_diff <- merge(dat1, dat2)
+      
+      gg_diff <-
+      dat_diff %>% 
+        merge(dat_aux, by = "icell") %>% 
+        ggplot(aes(x, y, fill = value_ds - value_obs))+
+        geom_raster()+
+        scale_fill_scico("diff", palette = "vik", midpoint = 0, direction = -1)+
+        facet_grid("ds - obs" ~ date)+
+        theme_bw()+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      gg_out <- wrap_plots(gg_crespi, gg_011, gg_ds, gg_diff, ncol = 1, guides = "collect")
+      
+      ggsave(fn_out, gg_out, width = 12, height = 7)
+      
+      
+    }
+    
+    
+  }
+  
+  
+  
+  
+}
 
 

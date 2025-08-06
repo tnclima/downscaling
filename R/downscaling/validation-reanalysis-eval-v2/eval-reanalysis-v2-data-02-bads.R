@@ -34,20 +34,22 @@ source("R/functions/etccdi.R")
 
 path_in <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v2/"
 path_in_v1 <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v1/"
+# path_in_v3 <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v3/"
 
 path_bads <- dir_ls(path_in) %>%
   str_subset("ba-qdm$", negate = T) %>%
   str_subset("ba-mbcn$", negate = T) %>% 
-  c(dir_ls(path_in_v1) %>% str_subset("bads"))
+  c(dir_ls(path_in_v1) %>% str_subset("bads"))# %>% 
+  # c(dir_ls(path_in_v3))
 
 # only redo subset
 # path_bads <- dir_ls(path_in) %>%
 #   str_subset("ds-lr$", negate = F)
 
 path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v2/"
-dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics")))
+dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics", "spatcor")))
 dir_create(path(path_out, "elev", c("mean-pctl", "ecdf", "dist-stat", "metrics")))
-dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "spatcor", "metrics")))
+dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "metrics")))
 
 
 date_sub <- as.Date(c("1989-01-02", "2008-12-31"))  
@@ -103,18 +105,19 @@ icell_common <- intersect(dat1[!is.na(pr), icell], dat2[!is.na(pr), icell])
 
 # spatcor fun -------------------------------------------------------------
 
-
-# template raster for autocor
-rr_template <- rast(file_orog)
-
-f_autocor <- function(dat, cl){
-  # if(all(dat[[cl]] == 0, na.rm = T)) return(data.table())
-  rr0 <- rast(rr_template)
-  rr0[dat$icell] <- dat[[cl]]
-  rr0[!(1:ncell(rr0) %in% icell_common)] <- NA
-  data.table(morani = autocor(rr0, method = "moran"),
-             gearyc = autocor(rr0, method = "geary"))
-}
+# not make sense, use simple cor instead
+# 
+# # template raster for autocor
+# rr_template <- rast(file_orog)
+# 
+# f_autocor <- function(dat, cl){
+#   # if(all(dat[[cl]] == 0, na.rm = T)) return(data.table())
+#   rr0 <- rast(rr_template)
+#   rr0[dat$icell] <- dat[[cl]]
+#   rr0[!(1:ncell(rr0) %in% icell_common)] <- NA
+#   data.table(morani = autocor(rr0, method = "moran"),
+#              gearyc = autocor(rr0, method = "geary"))
+# }
 
 # crespi data -------------------------------------------------------------
 
@@ -231,17 +234,17 @@ if(!file_exists(path(path_out, "icell", "mean-pctl", "crespi.rds"))){
   
   saveRDS(dat_crespi_icell_out1, path(path_out, "icell", "mean-pctl", "crespi.rds"))
 }
-
-if(!file_exists(path(path_out, "icell", "spatcor", "crespi.rds"))){
-  
-  dat_crespi_icell_out5 <- map(str_c(c("pr", "tasmin", "tasmax", "hn"), "_crespi"), \(x){
-    dat_crespi[, 
-               c(f_autocor(.SD, x), variable = x), 
-               .(season, date)]
-  }) %>% rbindlist
-  
-  saveRDS(dat_crespi_icell_out5, path(path_out, "icell", "spatcor", "crespi.rds"))
-}
+# 
+# if(!file_exists(path(path_out, "icell", "spatcor", "crespi.rds"))){
+#   
+#   dat_crespi_icell_out5 <- map(str_c(c("pr", "tasmin", "tasmax", "hn"), "_crespi"), \(x){
+#     dat_crespi[, 
+#                c(f_autocor(.SD, x), variable = x), 
+#                .(season, date)]
+#   }) %>% rbindlist
+#   
+#   saveRDS(dat_crespi_icell_out5, path(path_out, "icell", "spatcor", "crespi.rds"))
+# }
 
 
 
@@ -253,13 +256,18 @@ foreach(i_path = path_bads) %do% {
   files_bads <- dir_ls(i_path)
   i_bads <- path_file(i_path)
   
-  dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics"), i_bads))
+  dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics", "spatcor"), i_bads))
   dir_create(path(path_out, "elev", c("mean-pctl", "ecdf", "dist-stat", "metrics"), i_bads))
-  dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "spatcor", "metrics"), i_bads))
+  dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "metrics"), i_bads))
   
-  foreach(i = 1:nrow(dat_inv_loop_mod)) %do% {
+  lgl_obs_ds <- str_detect(i_bads, "obs-ds-pcalm")
+  
+  n_loop <- if(lgl_obs_ds) 1 else nrow(dat_inv_loop_mod)
+  n_shift <-  if(lgl_obs_ds) 0 else -1
+  
+  foreach(i = 1:n_loop) %do% {
     
-    i_rcm_name <- dat_inv_loop_mod[i, institute_rcm]
+    i_rcm_name <- if(lgl_obs_ds) "crespi" else  dat_inv_loop_mod[i, institute_rcm]
     files_read <- str_subset(files_bads, fixed(i_rcm_name))
     
     # files_out <- path(paths_out,
@@ -319,6 +327,21 @@ foreach(i_path = path_bads) %do% {
     dat_i_tnaa <- merge(dat_i_tnaa, dat_crespi_tnaa)
     dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
     
+    if(lgl_pr){
+      dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, n_shift)]
+      dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, n_shift)]
+      dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
+      
+      dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, n_shift), .(elev_fct)]
+      dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(elev_fct)]
+      dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
+      
+      dat_i[, pr_crespi := data.table::shift(pr_crespi, n_shift), .(icell)]
+      dat_i[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(icell)]
+      dat_i <- dat_i[!is.na(pr_crespi)]
+      
+    }      
+    
     # ** tnaa --------------------------------------------------------------------
     
     if(!file_exists(path(path_out, "tnaa", "mean-pctl", i_bads, i_rcm_name, ext = "rds"))){
@@ -377,14 +400,12 @@ foreach(i_path = path_bads) %do% {
     
     
     if(!file_exists(path(path_out, "tnaa", "metrics", i_bads, i_rcm_name, ext = "rds"))){
-      dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, -1)]
-      dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, -1)]
-      dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
       
       dat_i_tnaa_out6 <- map(map_vars, \(x){
         dat_i_tnaa[, 
                    .(mae = mean(abs(value - value_crespi)),
                      bias = mean(value - value_crespi),
+                     bias_rel = mean(value - value_crespi)/mean(value_crespi),
                      corr = cor(value, value_crespi),
                      variable = x),
                    .(season),
@@ -395,6 +416,26 @@ foreach(i_path = path_bads) %do% {
     } 
     
     
+    if(!file_exists(path(path_out, "tnaa", "spatcor", i_bads, i_rcm_name, ext = "rds"))){
+      
+      dat_i_tnaa_out7 <- map(map_vars, \(x){
+        dat_i[, 
+              .(spatcor = suppressWarnings(cor(value, value_crespi)),
+                spatcor_nonzero = suppressWarnings(
+                  cor(value[value > 0 & value_crespi > 0], 
+                      value_crespi[value > 0 & value_crespi > 0])
+                ),
+                variable = x),
+              .(season, date),
+              env = list(value = x, value_crespi = str_c(x, "_crespi"))] %>% 
+          .[,
+            .(spatcor = mean(spatcor, na.rm = T),
+              spatcor_nonzero = mean(spatcor_nonzero, na.rm = T)),
+            .(season, variable)]
+      }) %>% rbindlist   
+      
+      saveRDS(dat_i_tnaa_out7, path(path_out, "tnaa", "spatcor", i_bads, i_rcm_name, ext = "rds"))
+    } 
 
 
 # ** elev --------------------------------------------------------------------
@@ -453,14 +494,12 @@ foreach(i_path = path_bads) %do% {
     }
     
     if(!file_exists(path(path_out, "elev", "metrics", i_bads, i_rcm_name, ext = "rds"))){
-      dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, -1), .(elev_fct)]
-      dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, -1), .(elev_fct)]
-      dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
-      
+
       dat_i_elev_out6 <- map(map_vars, \(x){
         dat_i_elev[, 
                    .(mae = mean(abs(value - value_crespi)),
                      bias = mean(value - value_crespi),
+                     bias_rel = mean(value - value_crespi)/mean(value_crespi),
                      corr = cor(value, value_crespi),
                      variable = x),
                    .(season, elev_fct),
@@ -569,27 +608,25 @@ foreach(i_path = path_bads) %do% {
     }
     
     
-    if(!file_exists(path(path_out, "icell", "spatcor", i_bads, i_rcm_name, ext = "rds"))){
-      
-      dat_i_icell_out5 <- map(map_vars, \(x){
-        dat_i[, 
-              c(f_autocor(.SD, x), variable = x), 
-              .(season, date)]
-      }) %>% rbindlist
-      
-      saveRDS(dat_i_icell_out5, path(path_out, "icell", "spatcor", i_bads, i_rcm_name, ext = "rds"))
-    }
+    # if(!file_exists(path(path_out, "icell", "spatcor", i_bads, i_rcm_name, ext = "rds"))){
+    #   
+    #   dat_i_icell_out5 <- map(map_vars, \(x){
+    #     dat_i[, 
+    #           c(f_autocor(.SD, x), variable = x), 
+    #           .(season, date)]
+    #   }) %>% rbindlist
+    #   
+    #   saveRDS(dat_i_icell_out5, path(path_out, "icell", "spatcor", i_bads, i_rcm_name, ext = "rds"))
+    # }
     
     
     if(!file_exists(path(path_out, "icell", "metrics", i_bads, i_rcm_name, ext = "rds"))){
-      dat_i[, pr_crespi := data.table::shift(pr_crespi, -1), .(icell)]
-      dat_i[, hn_crespi := data.table::shift(hn_crespi, -1), .(icell)]
-      dat_i <- dat_i[!is.na(pr_crespi)]
       
       dat_i_icell_out6 <- map(map_vars, \(x){
         dat_i[, 
               .(mae = mean(abs(value - value_crespi)),
                 bias = mean(value - value_crespi),
+                bias_rel = mean(value - value_crespi)/mean(value_crespi),
                 corr = cor(value, value_crespi),
                 variable = x),
               .(season, icell),
