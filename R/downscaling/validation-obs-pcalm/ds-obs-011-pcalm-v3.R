@@ -18,7 +18,7 @@ source("R/functions/create_empty_netcdf.R")
 
 # settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v4/"
+path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v5/"
 
 
 date_sub <- as.Date(c("1989-01-02", "2008-12-31"))
@@ -55,7 +55,8 @@ upscale_pcs <- T # if T, high-res PCs will be upscaled and then merged to RCM
 # otherwise, nearest PC to gridcell center will be matched to RCM
 
 # n_pc <- 6 # number of PCs to use
-# tas_orog4pc1 <- T # if T, use orog instead of PC1 for temperature variables
+# orog_pcalog <- T # if T, use orog instead of PC1 for temperature variables
+# pr_pcalog <- T # if T, use results from logisticPCA for occurrence
 
 # obs 0.11 
 
@@ -77,7 +78,11 @@ files_obs_011 <- unlist(l_file_obs_011)
 
 
 
-dat_loop <- expand.grid(n_pc = 2:9, tas_orog4pc1 = c(T,F))
+# dat_loop <- expand.grid(n_pc = 2:9, orog_pcalog = c(T,F))
+dat_loop <- rbind(
+  expand.grid(n_pc = 2:9, orog_pcalog = c(T,F), pr_single = F),
+  expand.grid(n_pc = 2:9, orog_pcalog = F, pr_single = T)
+)
 
 
 # main loop ---------------------------------------------------------------
@@ -85,16 +90,22 @@ dat_loop <- expand.grid(n_pc = 2:9, tas_orog4pc1 = c(T,F))
 
 foreach(
   n_pc = dat_loop$n_pc,
-  tas_orog4pc1 = dat_loop$tas_orog4pc1
+  orog_pcalog = dat_loop$orog_pcalog,
+  pr_single = dat_loop$pr_single
 ) %do% {
   
   path_out_subdir <- str_c("obs-ds-pcalm-nPC", n_pc)
-  if(tas_orog4pc1){
-    path_out_subdir <- str_c(path_out_subdir, "-orog4PC1")
+  if(orog_pcalog){
+    path_out_subdir <- str_c(path_out_subdir, "-orog-pcalog")
+  }
+  if(pr_single){
+    path_out_subdir <- str_c(path_out_subdir, "-pr-single")
   }
   
+  files_loop <- if(pr_single) files_obs_011["pr"] else files_obs_011
+  
   zz <- foreach(
-    i_file = files_obs_011,
+    i_file = files_loop,
     .inorder = F,
     .final = \(x) rbindlist(x, fill = T)
   ) %dopar% {
@@ -135,14 +146,26 @@ foreach(
     
     
     # pca data
-    dat_pca <- readRDS(str_c("/home/climatedata/downscaling/pca-ked/crespi-pca/season-sub1000-",
-                             i_var, "-centerTRUE-scaleTRUE.rds"))
+    dat_pca <- readRDS(str_c("/home/climatedata/downscaling/pca-ked/crespi-pca/final-choice/season-sub0-",
+                             i_var, "-centerTRUE-scaleFALSE.rds"))
     sf_pca <- dat_pca %>%
       merge(dat_obs_orog[!is.na(orog)]) %>%
       st_as_sf(coords = c("lon", "lat"), crs = 4326)
     
     setnames(sf_pca, "orog", "orog_1km")
     setnames(sf_pca, "icell", "icell_1km")
+    
+    if(orog_pcalog){
+      
+      dat_pcalog <- readRDS("/home/climatedata/downscaling/pca-ked/crespi-pca/final-choice/pcalog-season-sub0-pr-th0.1-maineffectsTRUE.rds")
+      sf_pcalog <- dat_pca %>%
+        merge(dat_obs_orog[!is.na(orog)]) %>%
+        st_as_sf(coords = c("lon", "lat"), crs = 4326)
+      
+      setnames(sf_pcalog, "orog", "orog_1km")
+      setnames(sf_pcalog, "icell", "icell_1km")
+      
+    }
     
     # outfile ---------------------------------------------------------
     
@@ -171,6 +194,12 @@ foreach(
         dplyr::filter(season == i_season) %>% 
         dplyr::rename(orog = orog_1km)
       
+      if(orog_pcalog){
+        sf_newdata_pcalog <- sf_pcalog %>% 
+          dplyr::filter(season == i_season) %>% 
+          dplyr::rename(orog = orog_1km)
+      }
+      
       sf_obs_011 <- dat_obs_011[date == dates_loop[i_date]] %>% 
         merge(dat_obs_011_orog) %>% 
         st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% 
@@ -189,74 +218,125 @@ foreach(
         
         dat_pc_upscaled <- rs_pca_011 %>% as.data.table(cells = T, na.rm = F)
         setnames(dat_pc_upscaled, c("icell", str_c("PC", 1:n_pc)))
+        
+        if(orog_pcalog){
+          rs_pcalog_1km <- rast(rs_template_1km, nlyrs = n_pc)
+          rs_pcalog_1km[
+            dat_pcalog[season == i_season, icell]
+          ] <- dat_pcalog[season == i_season, str_c("PC", 1:n_pc), with=F]
+          
+          rs_pcalog_1km %>% flip %>% 
+            aggregate(fact = 10) %>%
+            resample(rs_template_011) -> rs_pcalog_011
+          
+          dat_pclog_upscaled <- rs_pcalog_011 %>% as.data.table(cells = T, na.rm = F)
+          setnames(dat_pclog_upscaled, c("icell", str_c("PC", 1:n_pc)))
+        }
       }
       
       if(i_var == "pr"){
+        # precip ----------------------------- # 
         
         if(upscale_pcs){
           sf_obs_011_pca <- merge(sf_obs_011, dat_pc_upscaled)
+          if(orog_pcalog) {
+            sf_obs_011_pcalog <- merge(sf_obs_011, dat_pclog_upscaled)
+          }
         } else {
           sf_obs_011_pca <- st_join(sf_obs_011, 
                                     sf_pca %>% dplyr::filter(season == i_season), 
                                     join = st_nearest_feature)
+          if(orog_pcalog){
+            sf_obs_011_pcalog <- st_join(sf_obs_011, 
+                                      sf_pcalog %>% dplyr::filter(season == i_season), 
+                                      join = st_nearest_feature)
+          }
           
         }
-        
-        sf_obs_011_pca$value_wet <- sf_obs_011_pca$value > pr_th
         
         if(pr_sqrt) sf_obs_011_pca <- dplyr::mutate(sf_obs_011_pca, value = sqrt(value))
         
-        # full dry
-        if(all(!sf_obs_011_pca$value_wet, na.rm = T)){
-          dat_pred <- data.table(icell = sf_newdata$icell_1km,
-                                 occurrence = 0,
-                                 intensity = 0)
+        if(pr_single){
+          # one mod ----------------------------- # 
           
-          dat_coef <- data.table(pr_type = "full_dry")
-          
-        } else {
-          
-          if(all(sf_obs_011_pca$value_wet, na.rm = T)){
-            # occurrence full wet
-            dat_pred_o <- data.table(icell = sf_newdata$icell_1km,
-                                     occurrence = 1)
-            
-            dat_coef_o <- data.table(pr_type = "full_wet")
-            
-          } else {
-            # occurrence partly wet
-            fmla <- as.formula(str_c("value_wet ~ ", str_c("PC", 1:n_pc, collapse = " + ")))
-            glm2 <- glm(fmla,
-                        data = sf_obs_011_pca, family = "binomial")
-            dat_pred_o <- data.table(icell = sf_newdata$icell_1km,
-                                     occurrence = predict(glm2, sf_newdata, type = "response"))
-            dat_coef_o <- broom::tidy(glm2) %>% cbind(pr_type = "partial_wet")
-          }
-          
-          # intensity
           fmla <- as.formula(str_c("value ~ ", str_c("PC", 1:n_pc, collapse = " + ")))
           lm2 <- lm(fmla, data = sf_obs_011_pca)
           
-          dat_pred <- cbind(dat_pred_o,
-                            intensity = predict(lm2, sf_newdata))
+          dat_pred <- data.table(icell = sf_newdata$icell_1km,
+                                 pred = predict(lm2, sf_newdata))
+          dat_pred[pred < 0, pred := 0]
+          dat_coef <- broom::tidy(lm2)
           
-          dat_coef_i <- broom::tidy(lm2)
+        } else {
           
-          dat_coef <- rbindlist(fill = T, list(
-            dat_coef_o %>% cbind(pr_step = "occurrence"),
-            dat_coef_i %>% cbind(pr_step = "intensity")
-          ))
+          # separate occurrence and intensity ----------------------------- # 
+          sf_obs_011_pca$value_wet <- sf_obs_011_pca$value > pr_th
+          if(orog_pcalog){
+            sf_obs_011_pcalog$value_wet <- sf_obs_011_pcalog$value > pr_th
+          }
           
+          # full dry
+          if(all(!sf_obs_011_pca$value_wet, na.rm = T)){
+            dat_pred <- data.table(icell = sf_newdata$icell_1km,
+                                   occurrence = 0,
+                                   intensity = 0)
+            
+            dat_coef <- data.table(pr_type = "full_dry")
+            
+          } else {
+            
+            if(all(sf_obs_011_pca$value_wet, na.rm = T)){
+              # occurrence full wet
+              dat_pred_o <- data.table(icell = sf_newdata$icell_1km,
+                                       occurrence = 1)
+              
+              dat_coef_o <- data.table(pr_type = "full_wet")
+              
+            } else {
+              # occurrence partly wet
+              fmla <- as.formula(str_c("value_wet ~ ", str_c("PC", 1:n_pc, collapse = " + ")))
+              
+              if(orog_pcalog){
+                glm2 <- glm(fmla, data = sf_obs_011_pcalog, family = "binomial")
+                dat_pred_o <- data.table(icell = sf_newdata_pcalog$icell_1km,
+                                         occurrence = predict(glm2, sf_newdata_pcalog, type = "response"))
+              } else {
+                glm2 <- glm(fmla, data = sf_obs_011_pca, family = "binomial")
+                dat_pred_o <- data.table(icell = sf_newdata$icell_1km,
+                                         occurrence = predict(glm2, sf_newdata, type = "response"))
+              }
+              
+              
+              dat_coef_o <- broom::tidy(glm2) %>% cbind(pr_type = "partial_wet")
+            }
+            
+            # intensity
+            fmla <- as.formula(str_c("value ~ ", str_c("PC", 1:n_pc, collapse = " + ")))
+            lm2 <- lm(fmla, data = sf_obs_011_pca)
+            
+            dat_pred <- cbind(dat_pred_o,
+                              intensity = predict(lm2, sf_newdata))
+            
+            dat_coef_i <- broom::tidy(lm2)
+            
+            dat_coef <- rbindlist(fill = T, list(
+              dat_coef_o %>% cbind(pr_step = "occurrence"),
+              dat_coef_i %>% cbind(pr_step = "intensity")
+            ))
+            
+          }
+          
+          dat_pred[, pred := (occurrence > pr_p_occur) * intensity]
+          dat_pred[pred < 0, pred := 0]
         }
         
-        dat_pred[, pred := (occurrence > pr_p_occur) * intensity]
         
         if(pr_sqrt) dat_pred[, pred := pred*pred]
         
-        dat_pred[pred < 0, pred := 0]
         
       } else {
-        
+
+        # temperature ----------------------------- # 
         if(upscale_pcs){
           sf_obs_011_pca <- merge(sf_obs_011, dat_pc_upscaled)
         } else {
@@ -278,7 +358,7 @@ foreach(
         }
         
         
-        if(tas_orog4pc1){
+        if(orog_pcalog){
           fmla <- as.formula(str_c("value ~ orog + ", str_c("PC", 2:n_pc, collapse = " + ")))  
         } else {
           fmla <- as.formula(str_c("value ~ ", str_c("PC", 1:n_pc, collapse = " + ")))
@@ -293,6 +373,8 @@ foreach(
         dat_coef <- broom::tidy(lm4)
         
       }
+      
+      # add data to nc ------------------------- #
       
       dat_out <- merge(dat_obs_orog, dat_pred, all.x = T)
       setorder(dat_out, "icell_nc")
@@ -316,7 +398,7 @@ foreach(
   }
   
   
-  saveRDS(zz, path("data/coef-obs-pcalm/", path_out_subdir, ext = "rds"))
+  saveRDS(zz, path("data/coef-obs-pcalm/v5/", path_out_subdir, ext = "rds"))
   
   
   

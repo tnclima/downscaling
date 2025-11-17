@@ -26,7 +26,7 @@ dat_aux_011[, date := NULL]
 date_sub <- c("2003-01-01", "2003-12-31") %>% as.Date
 date_loop <- seq(date_sub[1], date_sub[2], by = "day")
 
-path_in <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v3/"
+path_in <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v5/"
 
 
 l_file_crespi_011 <- list(
@@ -46,7 +46,7 @@ l_file_crespi <- list(
 
 f_read <- function(l_files, date1 = i_date1, date2 = i_date2, raw = F){
   
-  if("pr" %in% names(l_files)){
+  if("pr" %in% names(l_files) & "tasmin" %in% names(l_files)){
     
     dat_pr <- nc_grid_to_dt(l_files$pr, date_range = c(date1, date2))
     setnames(dat_pr, 3, "pr")
@@ -68,7 +68,7 @@ f_read <- function(l_files, date1 = i_date1, date2 = i_date2, raw = F){
     
     dat_i[, hn := snowfall(pr, tasmax, tasmin)]
     
-  } else {
+  } else if(!"pr" %in% names(l_files) & "tasmin" %in% names(l_files)){
     
     dat_tasmin <- nc_grid_to_dt(l_files$tasmin, date_range = c(date1, date2))
     setnames(dat_tasmin, 3, "tasmin")
@@ -79,8 +79,21 @@ f_read <- function(l_files, date1 = i_date1, date2 = i_date2, raw = F){
     dat_i <- cbind(dat_tasmax, tasmin = dat_tasmin$tasmin)
     dat_i <- dat_i[!is.na(tasmax)]
     
+  } else if("pr" %in% names(l_files) & ! "tasmin" %in% names(l_files)){
+    
+    dat_pr <- nc_grid_to_dt(l_files$pr, date_range = c(date1, date2))
+    setnames(dat_pr, 3, "pr")
+    
+    dat_i <- dat_pr
+    dat_i <- dat_i[!is.na(pr)]
+    
+    if(raw){
+      dat_i[, pr := pr*86400]
+    }
+    
   }
   
+   
   
   return(dat_i) 
 }
@@ -117,11 +130,15 @@ for(i in seq_along(date_loop)){
       names(files_read) <- c("tasmax", "tasmin")
       dat_i <- f_read(files_read, i_date, i_date)
       
-    } else {
+    } else if(length(files_read) == 3){
       # with pr
       names(files_read) <- c("pr", "tasmax", "tasmin")
       dat_i <- f_read(files_read, i_date, i_date)
       
+    } else if(length(files_read) == 1){
+      # only pr
+      names(files_read) <- c("pr")
+      dat_i <- f_read(files_read, i_date, i_date)
     }
     
     cbind(dat_i, bads = i_bads)
@@ -130,17 +147,15 @@ for(i in seq_along(date_loop)){
   
   dat_bads[, bads_fct := str_remove(bads, "obs-ds-pcalm-")]
   # dat_bads$bads_fct %>% unique
-  dat_bads[, bads_fct := fct_relevel(
-    bads_fct,
-    "nPC6-nomatchtas", "nPC6", "nPC6-PCupscaled", "nPC3-PCupscaled", "nPC9-PCupscaled"
-  )]
-  levels(dat_bads$bads_fct) <-  str_replace(levels(dat_bads$bads_fct), "-", "\n")
-  
-  
+  dat_bads[, n_pc := str_split_i(bads_fct, "-", 1) |> str_remove("nPC") |> as.numeric()]
+  dat_bads[, pc_extra := str_remove(bads_fct, "nPC[0-9]") |> str_remove("^-")]
+  # dat_plot[pc_extra == "", pc_extra := "no"]
+  # dat_bads[, table(pc_extra)]
+
 
   for(i_var in c("pr", "tasmin", "tasmax", "hn")){
     
-    fn_out <- path("fig/validation-obs-pcalm/ts-maps/",
+    fn_out <- path("fig/validation-obs-pcalm/v5/ts-maps/",
                    i_var,
                    str_c(i_date, sep = "_"),
                    ext = "png")
@@ -150,15 +165,6 @@ for(i in seq_along(date_loop)){
     lims_col <- range(dat_bads[[i_var]], dat_crespi_011[[i_var]], dat_crespi[[i_var]],
                       na.rm = T)
     
-    gg_bads <- dat_bads %>% 
-      merge(dat_aux) %>% 
-      ggplot(aes(x, y, fill = !!sym(i_var)))+
-      geom_raster()+
-      scale_fill_viridis_c(limits = lims_col)+
-      facet_grid("ds-pcalm" ~ bads_fct)+
-      theme_bw()+
-      coord_fixed()+
-      xlab(NULL)+ylab(NULL)
     
     gg_011 <- 
       dat_crespi_011 %>% 
@@ -181,27 +187,103 @@ for(i in seq_along(date_loop)){
       coord_fixed()+
       xlab(NULL)+ylab(NULL)
     
-    dat1 <- dat_bads[, c("bads_fct", "icell", "date", i_var), with = F]
-    setnames(dat1, i_var, "value_ds")
-    dat2 <- dat_crespi[, c("icell", "date", i_var), with = F]
-    setnames(dat2, i_var, "value_obs")
-    dat_diff <- merge(dat1, dat2)
+    if(i_var %in% c("tasmin", "tasmax")){
+      
+      dat_bads[, ff := ifelse(pc_extra == "", "PC1", "orog")]
+      
+      gg_bads <- dat_bads[!str_detect(bads, "pr-single")] %>% 
+        merge(dat_aux) %>% 
+        ggplot(aes(x, y, fill = !!sym(i_var)))+
+        geom_raster()+
+        scale_fill_viridis_c(limits = lims_col)+
+        facet_grid(ff ~ n_pc)+
+        theme_bw()+
+        theme(strip.text.y = element_text(angle = 0))+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      
+      dat1 <- dat_bads[!str_detect(bads, "pr-single"), c("bads_fct", "ff", "n_pc", "icell", "date", i_var), with = F]
+      setnames(dat1, i_var, "value_ds")
+      dat2 <- dat_crespi[, c("icell", "date", i_var), with = F]
+      setnames(dat2, i_var, "value_obs")
+      dat_diff <- merge(dat1, dat2)
+      
+      gg_diff <-
+        dat_diff %>% 
+        merge(dat_aux, by = "icell") %>% 
+        ggplot(aes(x, y, fill = value_ds - value_obs))+
+        geom_raster()+
+        scale_fill_scico("diff", palette = "vik", midpoint = 0, direction = -1)+
+        facet_grid(ff ~ n_pc)+
+        theme_bw()+
+        theme(strip.text.y = element_text(angle = 0))+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      gg_out <- wrap_plots(gg_crespi, gg_011, nrow = 1) %>% 
+        wrap_plots(gg_bads, gg_diff, ncol = 1, guides = "collect",
+                   heights = c(0.5, 1, 1))
+      
+      ggsave(fn_out, gg_out, width = 16, height = 9, create.dir = T)
+      
+      
+    } else {
+      if(i_var == "pr"){
+        dat_bads[, ff := ifelse(pc_extra == "", "PCA-occ-int",
+                                ifelse(pc_extra == "orog-pcalog",
+                                       "PCAlog-occ-PCA-int",
+                                       "PCA-int"))]
+      } else {
+        dat_bads[, ff := ifelse(pc_extra == "",
+                                "[tas]PC1 [pr]PCA-occ-int",
+                                "[tas]orog [pr]PCAlog-occ-PCA-int")]
+      }
+
+     
+      
+      
+      gg_bads <- dat_bads %>%
+        merge(dat_aux) %>% 
+        ggplot(aes(x, y, fill = !!sym(i_var)))+
+        geom_raster()+
+        scale_fill_viridis_c(limits = lims_col)+
+        facet_grid(ff ~ n_pc)+
+        theme_bw()+
+        theme(strip.text.y = element_text(angle = 0))+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      
+      dat1 <- dat_bads[, c("bads_fct", "ff", "n_pc", "icell", "date", i_var), with = F]
+      setnames(dat1, i_var, "value_ds")
+      dat2 <- dat_crespi[, c("icell", "date", i_var), with = F]
+      setnames(dat2, i_var, "value_obs")
+      dat_diff <- merge(dat1, dat2)
+      
+      
+      gg_diff <-
+        dat_diff %>% 
+        merge(dat_aux, by = "icell") %>% 
+        ggplot(aes(x, y, fill = (value_ds - value_obs)/value_obs))+
+        geom_raster()+
+        scale_fill_scico("diff", palette = "vik", midpoint = 0, direction = -1,
+                         limits = c(-1,2), oob = scales::oob_squish,
+                         labels = scales::label_percent())+
+        facet_grid(ff ~ n_pc)+
+        theme_bw()+
+        theme(strip.text.y = element_text(angle = 0))+
+        coord_fixed()+
+        xlab(NULL)+ylab(NULL)
+      
+      gg_out <- wrap_plots(gg_crespi, gg_011, nrow = 1) %>% 
+        wrap_plots(gg_bads, gg_diff, ncol = 1, guides = "collect",
+                   heights = c(0.5, 1, 1))
+      
+      ggsave(fn_out, gg_out, width = 16, height = 9, create.dir = T)
+      
+    }
     
-    gg_diff <-
-      dat_diff %>% 
-      merge(dat_aux, by = "icell") %>% 
-      ggplot(aes(x, y, fill = value_ds - value_obs))+
-      geom_raster()+
-      scale_fill_scico("diff", palette = "vik", midpoint = 0, direction = -1)+
-      facet_grid("ds - obs" ~ bads_fct)+
-      theme_bw()+
-      coord_fixed()+
-      xlab(NULL)+ylab(NULL)
-    
-    gg_out <- wrap_plots(gg_crespi, gg_011, nrow = 1) %>% 
-      wrap_plots(gg_bads, gg_diff, ncol = 1, guides = "collect")
-    
-    ggsave(fn_out, gg_out, width = 12, height = 6)
     
     
     

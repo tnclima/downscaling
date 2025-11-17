@@ -22,9 +22,9 @@ path_out <- "/home/climatedata/downscaling/pca-ked/crespi-pca/"
 path_out_varexp <- "/home/climatedata/downscaling/pca-ked/crespi-pca-varexp/"
 
 n_pc <- 20
-n_sub_dates <- 1000 # 0 for no subsetting
-center_pca <- F
-scale_pca <- T
+n_sub_dates <- 0 # 0 for no subsetting
+center_pca <- T
+scale_pca <- F
 
 seasons <- list("DJF" = c(12,1,2),
                 "MAM" = 3:5,

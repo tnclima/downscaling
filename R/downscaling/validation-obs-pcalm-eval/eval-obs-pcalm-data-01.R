@@ -29,7 +29,7 @@ source("R/functions/etccdi.R")
 
 # settings ----------------------------------------------------------------
 
-path_in <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v4/"
+path_in <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v5/"
 
 path_bads <- dir_ls(path_in)
 
@@ -37,7 +37,7 @@ path_bads <- dir_ls(path_in)
 # path_bads <- dir_ls(path_in) %>%
 #   str_subset("ds-lr$", negate = F)
 
-path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v4/"
+path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v5/"
 
 date_sub <- as.Date(c("1989-01-02", "2008-12-31"))  
 
@@ -146,33 +146,41 @@ foreach(i_path = path_bads) %do% {
   files_read <- str_subset(files_bads, fixed(i_rcm_name))
   
   lgl_pr <- any(str_detect(files_read, fixed("pr")))
+  lgl_tas <- any(str_detect(files_read, fixed("tas")))
   
   if(lgl_pr){
     dat_pr <- nc_grid_to_dt(str_subset(files_read, "pr"))
     setnames(dat_pr, 3, "pr")
     dat_pr <- dat_pr[!is.na(pr)]
   }      
+  if(lgl_tas){
+    dat_tasmin <- nc_grid_to_dt(str_subset(files_read, "tasmin"))
+    setnames(dat_tasmin, 3, "tasmin")
+    dat_tasmin <- dat_tasmin[!is.na(tasmin)]
+    
+    dat_tasmax <- nc_grid_to_dt(str_subset(files_read, "tasmax"))
+    setnames(dat_tasmax, 3, "tasmax")
+    dat_tasmax <- dat_tasmax[!is.na(tasmax)]
+  }
+ 
   
-  dat_tasmin <- nc_grid_to_dt(str_subset(files_read, "tasmin"))
-  setnames(dat_tasmin, 3, "tasmin")
-  dat_tasmin <- dat_tasmin[!is.na(tasmin)]
-  
-  dat_tasmax <- nc_grid_to_dt(str_subset(files_read, "tasmax"))
-  setnames(dat_tasmax, 3, "tasmax")
-  dat_tasmax <- dat_tasmax[!is.na(tasmax)]
-  
-  if(lgl_pr){
+  if(lgl_pr & lgl_tas){
     dat_i <- cbind(dat_pr, tasmax = dat_tasmax$tasmax, tasmin = dat_tasmin$tasmin)
     rm(dat_pr, dat_tasmin, dat_tasmax);gc();
     
     dat_i[, hn := snowfall(pr, tasmax, tasmin)]
     
     map_vars <- c("pr", "hn", "tasmax", "tasmin")
-  } else {
+  } else if(!lgl_pr & lgl_tas) {
     dat_i <- cbind(dat_tasmax, tasmin = dat_tasmin$tasmin)
     rm(dat_tasmin, dat_tasmax);gc();
     
     map_vars <- c("tasmax", "tasmin")
+  } else if(lgl_pr & !lgl_tas) {
+    dat_i <- dat_pr
+    rm(dat_pr);gc();
+    
+    map_vars <- c("pr")
   }
   
   dat_i[, season := mitmatmisc::season_fct(month(date))]
@@ -194,25 +202,30 @@ foreach(i_path = path_bads) %do% {
   dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
   
   if(lgl_pr){
+    
     dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, n_shift)]
-    dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, n_shift)]
-    dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
-    
     dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, n_shift), .(elev_fct)]
-    dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(elev_fct)]
-    dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
-    
     dat_i[, pr_crespi := data.table::shift(pr_crespi, n_shift), .(icell)]
-    dat_i[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(icell)]
+
+    if(lgl_tas){
+      dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, n_shift)]
+      dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(elev_fct)]
+      dat_i[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(icell)]
+    }
+    
+    dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
+    dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
     dat_i <- dat_i[!is.na(pr_crespi)]
     
-  }      
+  }
+  
+  
   
   # ** tnaa --------------------------------------------------------------------
   
   if(!file_exists(path(path_out, "tnaa", "mean-pctl", i_bads, i_rcm_name, ext = "rds"))){
     
-    if(lgl_pr){
+    if(lgl_pr & lgl_tas){
       dat_i_tnaa_out1 <- dat_i_tnaa[, c(
         mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
         pr_mean = mean(pr),
@@ -221,14 +234,15 @@ foreach(i_path = path_bads) %do% {
         mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
         mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
       ), .(season)]
-    } else {
+    } else if(!lgl_pr & lgl_tas) {
       dat_i_tnaa_out1 <- dat_i_tnaa[, c(
-        # mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
-        # pr_mean = mean(pr),
-        # mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
-        # hn_mean = mean(hn),
         mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
         mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+      ), .(season)]
+    } else if(lgl_pr & !lgl_tas) {
+      dat_i_tnaa_out1 <- dat_i_tnaa[, c(
+        mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+        pr_mean = mean(pr)
       ), .(season)]
     }
     
@@ -308,7 +322,7 @@ foreach(i_path = path_bads) %do% {
   
   if(!file_exists(path(path_out, "elev", "mean-pctl", i_bads, i_rcm_name, ext = "rds"))){
     
-    if(lgl_pr){
+    if(lgl_pr & lgl_tas){
       dat_i_elev_out1 <- dat_i_elev[, c(
         mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
         pr_mean = mean(pr),
@@ -317,14 +331,15 @@ foreach(i_path = path_bads) %do% {
         mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
         mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
       ), .(season, elev_fct)]
-    } else {
+    } else if(!lgl_pr & lgl_tas) {
       dat_i_elev_out1 <- dat_i_elev[, c(
-        # mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
-        # pr_mean = mean(pr),
-        # mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
-        # hn_mean = mean(hn),
         mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
         mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+      ), .(season, elev_fct)]
+    } else if(lgl_pr & !lgl_tas) {
+      dat_i_elev_out1 <- dat_i_elev[, c(
+        mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+        pr_mean = mean(pr)
       ), .(season, elev_fct)]
     }
     
@@ -381,7 +396,7 @@ foreach(i_path = path_bads) %do% {
   
   if(!file_exists(path(path_out, "icell", "mean-pctl", i_bads, i_rcm_name, ext = "rds"))){
     
-    if(lgl_pr){
+    if(lgl_pr & lgl_tas){
       dat_i_icell_out1 <- dat_i[, c(
         mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
         pr_mean = mean(pr),
@@ -390,14 +405,15 @@ foreach(i_path = path_bads) %do% {
         mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
         mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
       ), .(season, icell)]
-    } else {
+    } else if(!lgl_pr & lgl_tas) {
       dat_i_icell_out1 <- dat_i[, c(
-        # mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
-        # pr_mean = mean(pr),
-        # mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
-        # hn_mean = mean(hn),
         mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
         mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+      ), .(season, icell)]
+    } else if(lgl_pr & !lgl_tas) {
+      dat_i_icell_out1 <- dat_i[, c(
+        mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+        pr_mean = mean(pr)
       ), .(season, icell)]
     }
     
@@ -444,7 +460,7 @@ foreach(i_path = path_bads) %do% {
   
   if(!file_exists(path(path_out, "icell", "etccdi", i_bads, i_rcm_name, ext = "rds"))){
     
-    if(lgl_pr){
+    if(lgl_pr & lgl_tas){
       dat_i_icell_out4 <- map(
         c("tr", "su", "id", "fd", "rx1day", "r20mm", "wd", "sdii", "cdd"), 
         \(ind){
@@ -456,9 +472,21 @@ foreach(i_path = path_bads) %do% {
                 env = list(xpar = xx)] %>% 
             .[, .(value = mean(val), variable = ind), .(icell)]
         }) %>% rbindlist
-    } else {
+    } else if(!lgl_pr & lgl_tas) {
       dat_i_icell_out4 <- map(
         c("tr", "su", "id", "fd"), 
+        \(ind){
+          xx <- formalArgs(ind)
+          fun <- get(ind)
+          dat_i[,
+                .(val = fun(xpar)), 
+                .(icell, year(date)), 
+                env = list(xpar = xx)] %>% 
+            .[, .(value = mean(val), variable = ind), .(icell)]
+        }) %>% rbindlist
+    } else if(lgl_pr & !lgl_tas) {
+      dat_i_icell_out4 <- map(
+        c("rx1day", "r20mm", "wd", "sdii", "cdd"), 
         \(ind){
           xx <- formalArgs(ind)
           fun <- get(ind)

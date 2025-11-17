@@ -12,8 +12,8 @@ library(patchwork)
 library(forcats)
 library(stringr)
 
-nn <- "1000"
-suffix <- "centerTRUE-scaleTRUE"
+nn <- "0"
+suffix <- "centerTRUE-scaleFALSE"
 
 dat_aux <- nc_grid_to_dt("/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc", add_xy = T)
 dat_aux <- dat_aux[, .(icell, x = longitude, y = latitude, orog)]
