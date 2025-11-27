@@ -101,7 +101,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
       
       if(i_var %in% c("pr", "hn")) gg <- gg+scale_x_sqrt()
       
-      ggsave(fn_out, gg, width = 8, height = 4)
+      ggsave(fn_out, gg, width = 8, height = 4, create.dir = T)
       
       
     }
@@ -140,7 +140,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 20, height = 9)
+      ggsave(fn_out, gg, width = 20, height = 9, create.dir = T)
       
     }
     
@@ -164,7 +164,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 20, height = 9)
+      ggsave(fn_out, gg, width = 20, height = 9, create.dir = T)
       
       
       # rel
@@ -187,7 +187,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 20, height = 9)
+      ggsave(fn_out, gg, width = 20, height = 9, create.dir = T)
     }
     
     
@@ -245,7 +245,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 20, height = 9)
+      ggsave(fn_out, gg, width = 20, height = 9, create.dir = T)
       
     }
     
@@ -270,7 +270,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 20, height = 9)
+      ggsave(fn_out, gg, width = 20, height = 9, create.dir = T)
       
       
       # rel
@@ -293,7 +293,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 20, height = 9)
+      ggsave(fn_out, gg, width = 20, height = 9, create.dir = T)
     }
     
     
@@ -347,7 +347,7 @@ for(i_dist_test in unique(dat_plot$dist_test)){
         theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
         ggtitle(str_c(i_dist_test, i_var, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
     }
     
@@ -363,7 +363,7 @@ for(i_dist_test in unique(dat_plot$dist_test)){
         theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
         ggtitle(str_c(i_dist_test, i_var, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
     }
     
@@ -419,7 +419,7 @@ for(i_dist_test in unique(dat_plot$dist_test)){
         # theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
         ggtitle(str_c(i_dist_test, i_var, sep = " / "))
       
-      ggsave(fn_out, gg, width = 16, height = 8)
+      ggsave(fn_out, gg, width = 16, height = 8, create.dir = T)
       
       
       
@@ -483,7 +483,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
     ggtitle(i_var)
   
-  ggsave(fn_out, gg, width = 13, height = 6)
+  ggsave(fn_out, gg, width = 13, height = 6, create.dir = T)
   
 }
 
@@ -529,7 +529,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
       theme_bw()+
       ggtitle(i_var)
     
-    ggsave(fn_out, gg, width = 18, height = 6)
+    ggsave(fn_out, gg, width = 18, height = 6, create.dir = T)
     
   }
 }

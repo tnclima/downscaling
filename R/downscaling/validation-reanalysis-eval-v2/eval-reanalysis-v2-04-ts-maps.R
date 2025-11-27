@@ -16,8 +16,8 @@ library(foreach)
 source("R/functions/inv_sub_reanalysis.R")
 source("R/functions/snowfall.R")
 
-lgl_do_ba <- F # F to save time
-lgl_do_bads <- F # F to save time
+lgl_do_ba <- T # F to save time
+lgl_do_bads <- T # F to save time
 lgl_do_obs_pcalm <- F # F to save time
 
 dat_aux <- nc_grid_to_dt("/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc",
@@ -167,7 +167,7 @@ if(lgl_do_ba){
           coord_fixed()+
           xlab(NULL)+ylab(NULL)
         
-        ggsave(fn_out, gg, width = 12, height = 5)
+        ggsave(fn_out, gg, width = 12, height = 5, create.dir = T)
         
       }
       
@@ -319,7 +319,7 @@ if(lgl_do_bads){
         gg_out <- wrap_plots(gg_crespi, gg_011, nrow = 1, widths = c(1,3)) %>% 
           wrap_plots(gg_bads, ncol = 1, heights = c(1,2))
         
-        ggsave(fn_out, gg_out, width = 14, height = 6)
+        ggsave(fn_out, gg_out, width = 14, height = 6, create.dir = T)
       }
       
     }
@@ -419,7 +419,7 @@ if(lgl_do_obs_pcalm){
       
       gg_out <- wrap_plots(gg_crespi, gg_011, gg_ds, gg_diff, ncol = 1, guides = "collect")
       
-      ggsave(fn_out, gg_out, width = 12, height = 7)
+      ggsave(fn_out, gg_out, width = 12, height = 7, create.dir = T)
       
       
     }

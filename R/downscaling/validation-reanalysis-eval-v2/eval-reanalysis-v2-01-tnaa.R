@@ -98,7 +98,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     
     if(i_var %in% c("pr", "hn")) gg <- gg+scale_x_sqrt()
     
-    ggsave(fn_out, gg, width = 12, height = 6)
+    ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
     
   }
   
@@ -127,7 +127,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
     }
     
@@ -150,7 +150,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
       # rel
       fn_out <- path("fig/validation-eval-reanalysis/tnaa-ba/ecdf/",
@@ -170,7 +170,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
     }
     
@@ -222,7 +222,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
     }
     
@@ -245,7 +245,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
       # rel
       fn_out <- path("fig/validation-eval-reanalysis/tnaa/ecdf-bads/",
@@ -265,7 +265,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
         theme_bw()+
         ggtitle(str_c(i_var, i_seas, sep = " / "))
       
-      ggsave(fn_out, gg, width = 12, height = 6)
+      ggsave(fn_out, gg, width = 12, height = 6, create.dir = T)
       
     }
     
@@ -311,7 +311,7 @@ for(i_dist_test in unique(dat_plot$dist_test)){
       theme_bw()+
       ggtitle(str_c(i_dist_test, i_var, sep = " / "))
     
-    ggsave(fn_out, gg, width = 9, height = 6)
+    ggsave(fn_out, gg, width = 9, height = 6, create.dir = T)
     
   }
   
@@ -357,7 +357,7 @@ for(i_dist_test in unique(dat_plot$dist_test)){
       theme_bw()+
       ggtitle(str_c(i_dist_test, i_var, sep = " / "))
     
-    ggsave(fn_out, gg, width = 9, height = 6)
+    ggsave(fn_out, gg, width = 9, height = 6, create.dir = T)
     
   }
   
@@ -414,7 +414,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     theme_bw()+
     ggtitle(i_var)
   
-  ggsave(fn_out, gg, width = 9, height = 6)
+  ggsave(fn_out, gg, width = 9, height = 6, create.dir = T)
   
 }
   
@@ -458,7 +458,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     theme_bw()+
     ggtitle(i_var)
   
-  ggsave(fn_out, gg, width = 16, height = 6)
+  ggsave(fn_out, gg, width = 16, height = 6, create.dir = T)
   
 }
 
@@ -515,7 +515,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     theme_bw()+
     ggtitle(i_var)
   
-  ggsave(fn_out, gg, width = 9, height = 6)
+  ggsave(fn_out, gg, width = 9, height = 6, create.dir = T)
   
 }
 
@@ -559,7 +559,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     theme_bw()+
     ggtitle(i_var)
   
-  ggsave(fn_out, gg, width = 16, height = 6)
+  ggsave(fn_out, gg, width = 16, height = 6, create.dir = T)
   
 }
 

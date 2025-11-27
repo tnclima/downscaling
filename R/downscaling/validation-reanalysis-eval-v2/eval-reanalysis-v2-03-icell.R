@@ -115,7 +115,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     
       gg_out <- gg1/gg2
       
-      ggsave(fn_out, gg_out, width = 20, height = 8)
+      ggsave(fn_out, gg_out, width = 20, height = 8, create.dir = T)
         
     }
   }
@@ -201,7 +201,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
       
       ggsave(fn_out,
              gg1,
-             width = 20, height = 8)
+             width = 20, height = 8, create.dir = T)
       
     }
     
@@ -289,7 +289,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
       }
       
             
-      ggsave(fn_out, gg1, width = 20, height = 5)
+      ggsave(fn_out, gg1, width = 20, height = 5, create.dir = T)
       
     }
   }
@@ -354,7 +354,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
       
       ggsave(fn_out,
              gg1,
-             width = 20, height = plot_height)
+             width = 20, height = plot_height, create.dir = T)
       
     }
     
@@ -428,7 +428,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     
     ggsave(fn_out,
            gg,
-           width = 9, height = 6)
+           width = 9, height = 6, create.dir = T)
     
     
     # by rcm
@@ -452,7 +452,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
       
       ggsave(fn_out,
              gg,
-             width = 12, height = 6)
+             width = 12, height = 6, create.dir = T)
     }
     
   }
@@ -544,7 +544,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
     
     ggsave(fn_out,
            gg,
-           width = 9, height = 6)
+           width = 9, height = 6, create.dir = T)
     
     
     # by rcm
@@ -569,7 +569,7 @@ for(i_var in c("tasmin", "tasmax", "pr", "hn")){
       
       ggsave(fn_out,
              gg,
-             width = 12, height = 6)
+             width = 12, height = 6, create.dir = T)
     }
     
     
