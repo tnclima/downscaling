@@ -139,6 +139,23 @@ ggsave(str_c("fig/pca-ked/pca-results/season", nn, "-expvar-", suffix, ".png"),
        width = 12, height = 4)
 
 
+
+dat_expvar[!(variable != "pr" & pc_num == 1)] %>% 
+  ggplot(aes(pc_num, prop_sd, colour = season))+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~ variable, scales = "free_y")+
+  xlim(0, 20)+
+  theme_bw()+
+  xlab("PC")+
+  ylab("Exp Var per PC (not cumulative)")
+
+ggsave(str_c("fig/pca-ked/pca-results/season", nn, "-expvarSinglePC-", suffix, ".png"),
+       width = 12, height = 4)
+
+
+
+
 dat_expvar[pc_num == 1 & variable == "pr"] %>% summary
 dat_expvar[pc_num == 1 & variable != "pr"] %>% summary
 
