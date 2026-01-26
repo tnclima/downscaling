@@ -10,7 +10,7 @@ library(purrr)
 library(patchwork)
 library(ggh4x)
 library(scico)
-library(forcats)
+
 
 
 
@@ -55,36 +55,24 @@ dat_plot[, bads_ds := factor(bads_ds, levels = c(
 
 dat_plot[, bads_multi_fct := ifelse(bads_multi, "multivariate", "univariate")]
 
-# dat_plot[, bads2 := fct_(bads, levels = c(
-#   "bads-qdm", "bads-mbcn", "ba-qdm-ds-qdm2", "ba-mbcn-ds-qdm2", 
-#   "ba-qdm-ds-pcalm", "ba-mbcn-ds-pcalm"
-# ))]
+
 
 
 # plot --------------------------------------------------------------------
 
-dat_plot_spatcor <- dat_plot[!bads_ds %in% c("ds-qdm", "ds-lr", "ds-gam") &
-                               variable != "hn"] 
 
-dat_plot_spatcor[, bads2 := factor(bads, levels = c(
-  "bads-qdm", "bads-mbcn", "ba-qdm-ds-qdm2", "ba-mbcn-ds-qdm2", 
-  "ba-qdm-ds-pcalm", "ba-mbcn-ds-pcalm"
-))]
-
-gg <-
-dat_plot_spatcor %>% 
-  ggplot(aes(spatcor, fct_rev(bads2), fill = bads_multi_fct))+
+gg <- dat_plot[variable != "hn"] %>% 
+  ggplot(aes(bads_ds, spatcor, fill = bads_multi_fct))+
   geom_boxplot()+
-  scale_fill_brewer(NULL, palette = "Pastel1")+
-  facet_grid(season ~ variable, scales = "free_x", space = "free_x")+
+  facet_grid(variable ~ season, scales = "free_y")+
   theme_bw()+
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
         legend.title = element_blank(),
         legend.background = element_rect(colour = "grey40"),
         # legend.spacing = unit(0, "pt"),
-        legend.position = "bottom")+
-  ylab(NULL)+
-  xlab("Average correlation across space wrt observations")
+        legend.position = c(0.65, 0.45))+
+  xlab(NULL)+
+  ylab("Average correlation across space wrt observations")
 
 ggsave("fig/paper-ds/spatcor.png",
        gg, width = 10, height = 6)
@@ -95,8 +83,8 @@ ggsave("fig/paper-ds/spatcor.png",
 
 
 dat_plot[season == "DJF" & bads_multi == F,
-         median(spatcor),
-         .(variable, bads)] %>% 
-  dcast(bads ~ variable)
+         mean(spatcor),
+         .(variable, bads_ds)] %>% 
+  dcast(bads_ds ~ variable)
 
 

@@ -9,7 +9,6 @@ library(stringr)
 library(purrr)
 library(patchwork)
 library(ggh4x)
-library(forcats)
 
 
 
@@ -77,15 +76,18 @@ dat_plot[, bads_multi_fct := ifelse(bads_multi, "multivariate", "univariate")]
 
 # tasmax ------------------------------------------------------------------
 
-gg <-
-  dat_plot[variable == "tasmax" & bads_multi == F & metric != "bias_rel"] %>% 
-  ggplot(aes(value, bads))+
-  geom_vline(data = data.frame(xx = 0, metric2_fct = "Bias"),
-             aes(xintercept = xx), linetype = "dashed")+
+gg <- dat_plot[variable == "tasmax" & bads_multi == F & metric != "bias_rel"] %>% 
+  ggplot(aes(bads_ds, value))+
+  geom_hline(data = data.frame(yy = 0, metric2_fct = "Bias"),
+             aes(yintercept = yy), linetype = "dashed")+
   geom_boxplot()+
-  facet_grid(season ~ metric2_fct, scales = "free_x")+
+  facet_grid(metric2_fct ~ season, scales = "free_y", switch = "y")+
   # scale_y_facet(metric2_fct == "bias", labels = scales::label_percent())+
   theme_bw()+
+  theme(strip.placement = "outside", 
+        strip.background.y = element_blank(),
+        strip.text.y.left = element_text(size = rel(1.2)),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
   xlab(NULL)+
   ylab(NULL)
 
@@ -99,13 +101,17 @@ ggsave("fig/paper-ds/ds-metrics_tasmax.png",
 
 
 gg <- dat_plot[variable == "tasmin" & bads_multi == F & metric != "bias_rel"] %>% 
-  ggplot(aes(value, bads))+
-  geom_vline(data = data.frame(xx = 0, metric2_fct = "Bias"),
-             aes(xintercept = xx), linetype = "dashed")+
+  ggplot(aes(bads_ds, value))+
+  geom_hline(data = data.frame(yy = 0, metric2_fct = "Bias"),
+             aes(yintercept = yy), linetype = "dashed")+
   geom_boxplot()+
-  facet_grid(season ~ metric2_fct, scales = "free_x")+
+  facet_grid(metric2_fct ~ season, scales = "free_y", switch = "y")+
   # scale_y_facet(metric2_fct == "bias", labels = scales::label_percent())+
   theme_bw()+
+  theme(strip.placement = "outside", 
+        strip.background.y = element_blank(),
+        strip.text.y.left = element_text(size = rel(1.2)),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
   xlab(NULL)+
   ylab(NULL)
 
@@ -118,13 +124,17 @@ ggsave("fig/paper-ds/ds-metrics_tasmin.png",
 
 
 gg <- dat_plot[variable == "pr" & bads_multi == F & metric != "bias"] %>% 
-  ggplot(aes(value, bads))+
-  geom_vline(data = data.frame(xx = 0, metric2_fct = "Bias"),
-             aes(xintercept = xx), linetype = "dashed")+
+  ggplot(aes(bads_ds, value))+
+  geom_hline(data = data.frame(yy = 0, metric2_fct = "Bias"),
+             aes(yintercept = yy), linetype = "dashed")+
   geom_boxplot()+
-  facet_grid(season ~ metric2_fct, scales = "free_x")+
-  scale_x_facet(metric2_fct == "Bias", labels = scales::label_percent())+
+  facet_grid(metric2_fct ~ season, scales = "free_y", switch = "y")+
+  scale_y_facet(metric2_fct == "Bias", labels = scales::label_percent())+
   theme_bw()+
+  theme(strip.placement = "outside", 
+        strip.background.y = element_blank(),
+        strip.text.y.left = element_text(size = rel(1.2)),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
   xlab(NULL)+
   ylab(NULL)
 
@@ -135,33 +145,25 @@ ggsave("fig/paper-ds/ds-metrics_pr.png",
 
 # hn ----------------------------------------------------------------------
 
-dat_plot_hn <- dat_plot[variable == "hn" & 
-                          season %in% c("DJF", "MAM") & 
-                          metric != "bias" & 
-                          bads_ds != "ds-qdm"]
 
-dat_plot_hn[, bads2 := factor(bads, levels = c(
-  "bads-qdm", "bads-mbcn", "ba-qdm-ds-qdm2", "ba-mbcn-ds-qdm2", 
-  "ba-qdm-ds-pcalm", "ba-mbcn-ds-pcalm"
-))]
-
-gg <-
-  dat_plot_hn %>% 
-  ggplot(aes(value, fct_rev(bads2), fill = bads_multi_fct))+
-  geom_vline(data = data.frame(xx = 0, metric2_fct = "Bias"),
-             aes(xintercept = xx), linetype = "dashed")+
+gg <- dat_plot[variable == "hn" & season %in% c("DJF", "MAM") & metric != "bias"] %>% 
+  ggplot(aes(bads_ds, value, fill = bads_multi_fct))+
+  geom_hline(data = data.frame(yy = 0, metric2_fct = "Bias"),
+             aes(yintercept = yy), linetype = "dashed")+
   geom_boxplot()+
-  facet_grid(season ~ metric2_fct, scales = "free_x")+
-  scale_x_facet(metric2_fct == "Bias", labels = scales::label_percent())+
+  facet_grid(metric2_fct ~ season, scales = "free_y", switch = "y")+
+  scale_y_facet(metric2_fct == "Bias", labels = scales::label_percent())+
   scale_fill_brewer(NULL, palette = "Pastel1")+
   theme_bw()+
-  theme(legend.position = "bottom")+
+  theme(strip.placement = "outside", 
+        strip.background.y = element_blank(),
+        strip.text.y.left = element_text(size = rel(1.2)))+
   xlab(NULL)+
   ylab(NULL)
 
 
 ggsave("fig/paper-ds/ds-metrics_hn.png",
-       gg, width = 8, height = 5)
+       gg, width = 8, height = 6)
 
 
 
@@ -174,10 +176,7 @@ dat_plot[variable == "tasmax" & bads_multi == F & metric == "corr", mean(value),
 dat_plot[variable == "tasmax" & bads_multi == F & metric == "mae", mean(value), season]
 dat_plot[variable == "pr" & bads_multi == F & metric == "bias_rel" & season == "DJF", mean(value), bads_ds]
 dat_plot[variable == "pr" & bads_multi == F & metric == "corr" & season == "DJF", mean(value), bads_ds]
-dat_plot[variable == "pr" & bads_multi == F & metric == "bias_rel", mean(value), .(season, bads)]
-
-dat_plot[variable == "hn" & metric == "bias_rel" & season == "DJF", median(value), keyby = .(bads_multi, bads_ds)]
-dat_plot[variable == "hn" & metric == "bias_rel" & season == "MAM", median(value), keyby = .(bads_multi, bads_ds)]
+dat_plot[variable == "pr" & bads_multi == F & metric == "bias_rel", mean(value), .(season, bads_ds)]
 
 
 dat_zz <- dat_plot[variable == "tasmax" & bads_multi == F & bads_ds != "ds-qdm"] %>% 

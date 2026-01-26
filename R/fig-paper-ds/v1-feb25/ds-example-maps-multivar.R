@@ -150,11 +150,10 @@ dat_mbcn <- f_read(l_files, i_date, i_date)
 
 dat_plot_011_tasmax <- rbind(
   # cbind(dat_raw, ff = "raw"),
-  cbind(dat_qdm, ff = "ba-qdm", multivar = "univariate"),
-  cbind(dat_mbcn, ff = "ba-mbcn", multivar = "multivariate")
+  cbind(dat_qdm, ff = "ba-qdm"),
+  cbind(dat_mbcn, ff = "ba-mbcn")
 )
 dat_plot_011_tasmax[, ff_fct := fct_inorder(ff)]
-dat_plot_011_tasmax[, multivar_fct := fct_inorder(multivar)]
 
 dat_plot_011_tasmax <- dat_plot_011_tasmax[icell %in% dat_qdm$icell]
 
@@ -208,11 +207,6 @@ dat_bads_tasmax[, bads_multi_fct := factor(ifelse(bads_multi, "multivariate", "u
                                            levels = c("univariate", "multivariate"))]
 
 
-dat_bads_tasmax[, bads2 := factor(bads, levels = c(
-  "bads-qdm", "bads-mbcn", "ba-qdm-ds-qdm2", "ba-mbcn-ds-qdm2", 
-  "ba-qdm-ds-pcalm", "ba-mbcn-ds-pcalm"
-))]
-
 
 
 
@@ -245,11 +239,10 @@ dat_mbcn <- f_read(l_files, i_date, i_date)
 
 dat_plot_011_pr <- rbind(
   # cbind(dat_raw, ff = "raw"),
-  cbind(dat_qdm, ff = "ba-qdm", multivar = "univariate"),
-  cbind(dat_mbcn, ff = "ba-mbcn", multivar = "multivariate")
+  cbind(dat_qdm, ff = "ba-qdm"),
+  cbind(dat_mbcn, ff = "ba-mbcn")
 )
 dat_plot_011_pr[, ff_fct := fct_inorder(ff)]
-dat_plot_011_pr[, multivar_fct := fct_inorder(multivar)]
 
 dat_plot_011_pr <- dat_plot_011_pr[icell %in% dat_qdm$icell]
 
@@ -301,10 +294,9 @@ dat_bads_pr[, bads_ds := factor(bads_ds, levels = c(
 dat_bads_pr[, bads_multi_fct := factor(ifelse(bads_multi, "multivariate", "univariate"),
                                        levels = c("univariate", "multivariate"))]
 
-dat_bads_pr[, bads2 := factor(bads, levels = c(
-  "bads-qdm", "bads-mbcn", "ba-qdm-ds-qdm2", "ba-mbcn-ds-qdm2", 
-  "ba-qdm-ds-pcalm", "ba-mbcn-ds-pcalm"
-))]
+
+
+
 
 
 # plot --------------------------------------------------------------------
@@ -328,14 +320,13 @@ gg_bads_tasmax <-
   geom_raster()+
   # scale_fill_viridis_c(limits = lims_col)+
   scale_fill_scico(palette = "lajolla", limits = lims_col_tasmax)+
-  # facet_grid(bads_multi_fct ~ bads)+
-  facet_wrap(~bads2, nrow = 2, dir = "v")+
+  facet_grid(bads_ds ~ bads_multi_fct)+
   xlim(lims_x)+ylim(lims_y)+
   theme_bw()+
   theme(axis.title = element_blank(),
         axis.ticks = element_blank(),
         axis.text = element_blank(),
-        legend.position = "right")+
+        legend.position = "bottom")+
   coord_fixed()+
   xlab(NULL)+ylab(NULL)
 
@@ -346,7 +337,7 @@ gg_011_tasmax <-
   geom_raster()+
   # scale_fill_viridis_c(limits = lims_col)+
   scale_fill_scico(palette = "lajolla", limits = lims_col_tasmax)+
-  facet_grid(multivar_fct ~ "RCM 0.11", switch = "y")+
+  facet_grid(. ~ ff_fct)+
   xlim(lims_x)+ylim(lims_y)+
   theme_bw()+
   theme(axis.title = element_blank(),
@@ -364,14 +355,13 @@ gg_bads_pr <-
   ggplot(aes(x, y, fill = pr))+
   geom_raster()+
   scale_fill_scico(palette = "brocO", limits = lims_col_pr, direction = -1, midpoint = 0)+
-  # facet_grid(bads_ds ~ bads_multi_fct)+
-  facet_wrap(~bads2, nrow = 2, dir = "v")+
+  facet_grid(bads_ds ~ bads_multi_fct)+
   xlim(lims_x)+ylim(lims_y)+
   theme_bw()+
   theme(axis.title = element_blank(),
         axis.ticks = element_blank(),
         axis.text = element_blank(),
-        legend.position = "right")+
+        legend.position = "bottom")+
   coord_fixed()+
   xlab(NULL)+ylab(NULL)
 
@@ -381,7 +371,7 @@ gg_011_pr <-
   ggplot(aes(lon, lat, fill = pr))+
   geom_raster()+
   scale_fill_scico(palette = "brocO", limits = lims_col_pr, direction = -1, midpoint = 0)+
-  facet_grid(multivar_fct ~ "RCM 0.11", switch = "y")+
+  facet_grid(. ~ ff_fct)+
   xlim(lims_x)+ylim(lims_y)+
   theme_bw()+
   theme(axis.title = element_blank(),
@@ -401,16 +391,15 @@ gg_011_pr <-
 
 gg_out <-
   wrap_plots( 
-    gg_011_tasmax, gg_bads_tasmax,
-    gg_011_pr, gg_bads_pr, 
+    gg_011_tasmax, gg_011_pr, 
+    gg_bads_tasmax, gg_bads_pr, 
     # ncol = 1, 
-    # heights = c(1,3))+
-    widths = c(1.1,3))+
+    heights = c(1,3))+
   plot_annotation(tag_levels = "a", tag_suffix = ")")
 
 
 ggsave("fig/paper-ds/ds-example-maps_multivar.png", 
-       gg_out, width = 8, height = 6)
+       gg_out, width = 9, height = 8)
 
 
 

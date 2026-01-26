@@ -212,7 +212,7 @@ dat_bads %>%
   geom_raster()+
   # scale_fill_viridis_c(limits = lims_col)+
   scale_fill_scico(palette = "lajolla", limits = lims_col)+
-  facet_wrap( ~ bads, dir = "v", nrow = 2)+
+  facet_wrap( ~ bads_ds, dir = "v", nrow = 2)+
   xlim(lims_x)+ylim(lims_y)+
   theme_bw()+
   theme(axis.title = element_blank(),
@@ -373,7 +373,7 @@ gg_bads <-
   geom_raster()+
   # scale_fill_viridis_c(limits = lims_col)+
   scale_fill_scico(palette = "lajolla", limits = lims_col)+
-  facet_wrap( ~ bads, dir = "v", nrow = 2)+
+  facet_wrap( ~ bads_ds, dir = "v", nrow = 2)+
   xlim(lims_x)+ylim(lims_y)+
   theme_bw()+
   theme(axis.title = element_blank(),
@@ -536,7 +536,7 @@ gg_bads <-
   ggplot(aes(x, y, fill = !!sym(i_var)))+
   geom_raster()+
   scale_fill_scico(palette = "brocO", limits = lims_col, direction = -1, midpoint = 0)+
-  facet_wrap( ~ bads, dir = "v", nrow = 2)+
+  facet_wrap( ~ bads_ds, dir = "v", nrow = 2)+
   xlim(lims_x)+ylim(lims_y)+
   theme_bw()+
   theme(axis.title = element_blank(),
