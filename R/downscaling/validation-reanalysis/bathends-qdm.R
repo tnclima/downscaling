@@ -22,7 +22,8 @@ source("R/functions/inv_sub_reanalysis.R")
 # settings - variables ----------------------------------------------------
 
 path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v2/"
-ba_variants <- c("qdm", "mbcn")
+# ba_variants <- c("qdm", "mbcn")
+ba_variants <- c("mbcnspat")
 
 date_rcm_sub <- as.Date(c("1989-01-02", "2008-12-31"))
 # l_years_train_period <- readRDS("data/random-years-reanalysis.rds")
