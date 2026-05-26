@@ -309,6 +309,9 @@ dat_bads_pr[, bads2 := factor(bads, levels = c(
 
 # plot --------------------------------------------------------------------
 
+dat_bads_pr <- dat_bads_pr[!is.na(bads_ds)]
+dat_bads_tasmax <- dat_bads_tasmax[!is.na(bads_ds)]
+
 
 lims_col_tasmax <- range(dat_bads_tasmax$tasmax,
                          dat_plot_011_tasmax$tasmax,
@@ -412,6 +415,6 @@ gg_out <-
 ggsave("fig/paper-ds/ds-example-maps_multivar.png", 
        gg_out, width = 8, height = 6)
 
-
-
+ggsave("fig/paper-ds-rev1/ds-example-maps_multivar.pdf", 
+       gg_out, width = 8, height = 6)
 

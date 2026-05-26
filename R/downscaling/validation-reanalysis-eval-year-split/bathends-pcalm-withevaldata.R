@@ -11,20 +11,31 @@ library(stringr)
 library(gstat)
 library(sf)
 library(eurocordexr)
+library(purrr)
 
 source("R/functions/create_empty_netcdf.R")
 source("R/functions/inv_sub_reanalysis.R")
+source("R/functions/snowfall.R")
 
-# settings - variables ----------------------------------------------------
 
-path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v2/"
+extended_l_years_train_period <- readRDS("data/random-years-reanalysis-extended.rds")
+
+path_tmp_nc <- "/home/climatedata/downscaling/validation-cv-reanalysis/zz-tmp-dspcalm/"
+# if(dir_exists(path_tmp_nc)) stop("tmp directory exists!")
+dir_create(path_tmp_nc)
+
+path_in_baqdm <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v6/ba-qdm/"
+
+# settings ba ds ----------------------------------------------------
+
 # ba_variants <- c("qdm", "mbcn")
-ba_variants <- c("mbcnspat")
+# ba_variants <- c("mbcnspat")
+# ba_variants <- c("qdm")
 
 date_rcm_sub <- as.Date(c("1989-01-02", "2008-12-31"))
 dates_loop <- seq(date_rcm_sub[1], date_rcm_sub[2], by = "day")
 n_nc_sync <- 200 # intermediate save to nc_out file every n dates
-n_cores <- 7 # parallel computation; (reads RCM memory, no need for crespi)
+n_cores <- 5 # parallel computation; (reads RCM memory, no need for crespi)
 
 pr_th <- 0.1 # threshold for zero precip (mm)
 pr_p_occur <- 0.5 # probability threshold for prediction of precip occurence
@@ -89,23 +100,116 @@ dat_settings <- rbind(fill = T,
 dat_inv <- inv_sub_reanalysis()
 dat_inv_loop <- dat_inv[variable %in% c("pr", "tasmin", "tasmax")]
 
+dat_inv_loop_mod <- dat_inv_loop[, .(gcm, institute_rcm, experiment, 
+                                     ensemble, downscale_realisation)] %>% unique()
 
 
-# main loop ---------------------------------------------------------------
+
+# ** settings eval ** -----------------------------------------------------
+
+
+# crespi data for eval ----------------------------------------------------
+
+
+
+date_sub <- as.Date(c("1989-01-02", "2008-12-31"))  
+
+pctl_pr <- c(0.95, 0.99, 1)
+pctl_tas <- c(0, 0.01, 0.05, 0.5, 0.95, 0.99, 1)
+pctl_ecdf <- seq(0, 1, by=0.01)
+
+elev_breaks <- seq(0, 3500, by = 500)
+
+
+# elev --------------------------------------------------------------------
+
+# file_orog <- "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc"
+file_orog <- "/home/climatedata/obs/orography/crespi_lonlat_1km_temperature.nc"
+# file_orog <- "/home/climatedata/obs/orography/crespi_lonlat_1km_precipitation.nc"
+
+dat_orog <- nc_grid_to_dt(file_orog, add_xy = T)
+dat_orog <- dat_orog[!is.na(orog)]
+
+# dat_orog$orog %>% hist(50)
+# dat_orog$orog %>% summary
+
+dat_orog[, elev_fct := cut(orog, breaks = elev_breaks, dig.lab = 5)]
+# dat_orog %>% ggplot(aes(longitude, latitude, fill = orog))+geom_raster()
+# summary(dat_orog$elev_fct)
+
+
+
+
+
+# common icell upscaled crespi
+
+dat1 <- nc_grid_to_dt("/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v2/ba-qdm-ds-qdm/pr_CLMcom-CCLM4-8-17_ECMWF-ERAINT_evaluation.nc",
+                      date_range = c("2000-01-01", "2000-01-01"))
+dat2 <- nc_grid_to_dt("/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v1/bads-qdm/pr_CLMcom-CCLM4-8-17_ECMWF-ERAINT_evaluation.nc",
+                      date_range = c("2000-01-01", "2000-01-01"))
+icell_common <- intersect(dat1[!is.na(pr), icell], dat2[!is.na(pr), icell])
+
+
+# crespi data 
+
+# defined above
+# l_file_obs <- list(
+#   tasmax = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MaxTemp.nc",
+#   tasmin = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MinTemp.nc",
+#   pr = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_Prec.nc"
+# )
+
+dat_pr <- nc_grid_to_dt(l_file_obs[["pr"]], date_range = date_sub)
+setnames(dat_pr, 3, "pr_crespi")
+dat_pr <- dat_pr[!is.na(pr_crespi)]
+
+dat_tasmin <- nc_grid_to_dt(l_file_obs[["tasmin"]], date_range = date_sub)
+setnames(dat_tasmin, 3, "tasmin_crespi")
+dat_tasmin <- dat_tasmin[!is.na(tasmin_crespi)]
+
+dat_tasmax <- nc_grid_to_dt(l_file_obs[["tasmax"]], date_range = date_sub)
+setnames(dat_tasmax, 3, "tasmax_crespi")
+dat_tasmax <- dat_tasmax[!is.na(tasmax_crespi)]
+
+dat_crespi <- cbind(dat_pr, 
+                    tasmax_crespi = dat_tasmax$tasmax_crespi, 
+                    tasmin_crespi = dat_tasmin$tasmin_crespi)
+
+dat_crespi[, hn_crespi := snowfall(pr_crespi, tasmax_crespi, tasmin_crespi)]
+
+rm(dat_pr, dat_tasmax, dat_tasmin); gc();
+
+dat_crespi[pr_crespi < 0, pr_crespi := 0]
+dat_crespi[hn_crespi < 0, hn_crespi := 0]
+dat_crespi[, season := mitmatmisc::season_fct(month(date))]
+dat_crespi <- dat_crespi %>% merge(dat_orog[, .(icell, elev_fct)])
+
+dat_crespi_tnaa <- dat_crespi[icell %in% icell_common,
+                              lapply(.SD, mean),
+                              .(date, season),
+                              .SDcols = str_c(c("pr", "hn", "tasmax", "tasmin"), "_crespi")]
+
+dat_crespi_elev <- dat_crespi[icell %in% icell_common,
+                              lapply(.SD, mean),
+                              .(date, season, elev_fct),
+                              .SDcols = str_c(c("pr", "hn", "tasmax", "tasmin"), "_crespi")]
+
+
+# ** start loop extended years ** ---------------------------------------------------------------
 
 mitmatmisc::init_parallel_ubuntu(n_cores)
 
-zz2 <- foreach(
-  i_ba = ba_variants,
-  .final = \(x) rbindlist(x, fill = T)
-) %do% {
+
+for(i_ext in 1:length(extended_l_years_train_period)){
   
-  files_ba <- dir_ls(path(path_out, str_c("ba-", i_ba)))
+  l_years_train_period <- extended_l_years_train_period[[i_ext]]
   
-  zz <- foreach(
+  
+  files_ba <- dir_ls(path(path_in_baqdm, i_ext))
+  
+  foreach(
     i_file_ba = files_ba,
-    .inorder = F,
-    .final = \(x) rbindlist(x, fill = T)
+    .inorder = F
   ) %dopar% {
     
     i_file_ba_split <- i_file_ba %>% 
@@ -120,8 +224,8 @@ zz2 <- foreach(
     # file_obs_orog <- "/home/climatedata/downscaling/obs4rcm_lonlat_tnaa/orog_eudem_1km.nc"
     file_obs_orog <- l_file_obs_orog[[i_var]]
     
-    file_out <- path(path_out,
-                     str_c("ba-", i_ba, "-ds-pcalm"),
+    file_out <- path(path_tmp_nc,
+                     i_ext,
                      path_file(i_file_ba))
     
     if(file_exists(file_out)) return(NULL)
@@ -194,9 +298,9 @@ zz2 <- foreach(
     i_nc_sync <- 0
     
     
-    dat_coef_out <- foreach(
-      i_date = seq_along(dates_loop),
-      .final = \(x) rbindlist(x, fill = T)
+    foreach(
+      i_date = seq_along(dates_loop)
+      # .final = \(x) rbindlist(x, fill = T)
     ) %do% {
       
       # i_rcm <- mapped_times[dates_loop[i_date] == dates_full, idx_pcict] # for non-standard cal
@@ -253,7 +357,7 @@ zz2 <- foreach(
         }
       }
       
-    
+      
       if(i_var == "pr"){
         # precip ----------------------------- # 
         
@@ -387,7 +491,7 @@ zz2 <- foreach(
         dat_pred <- data.table(icell = sf_newdata$icell_1km,
                                pred = predict(lm4, sf_newdata))
         
-        dat_coef <- broom::tidy(lm4)
+        # dat_coef <- broom::tidy(lm4)
       }
       
       
@@ -404,11 +508,11 @@ zz2 <- foreach(
       
       if(i_nc_sync %% n_nc_sync == 0) nc_sync(nc_out)
       
-      data.table(dat_coef) %>% 
-        cbind(date = dates_loop[i_date],
-              variable = i_var,
-              institute_rcm = i_rcm_name,
-              ba = i_ba)
+      # data.table(dat_coef) %>% 
+      #   cbind(date = dates_loop[i_date],
+      #         variable = i_var,
+      #         institute_rcm = i_rcm_name,
+      #         ba = i_ba)
       
       
     }
@@ -416,11 +520,338 @@ zz2 <- foreach(
     
     nc_close(nc_out)
     
-    dat_coef_out
+    # dat_coef_out
     
   }
   
+  
+  
+  
+  
+  # ** start eval ** ----------------------------------------------------------------
+  
+  i_path <- path(path_tmp_nc, i_ext)
+  i_bads <- "ba-qdm-ds-pcalm"
+  
+  path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v6/"
+  dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics", "spatcor")))
+  dir_create(path(path_out, "elev", c("mean-pctl", "ecdf", "dist-stat", "metrics")))
+  dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "metrics")))
+  
+  
+  
+  # main loop ---------------------------------------------------------------
+  
+  files_bads <- dir_ls(i_path)
+  
+  dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics", "spatcor"), i_bads, i_ext))
+  dir_create(path(path_out, "elev", c("mean-pctl", "ecdf", "dist-stat", "metrics"), i_bads, i_ext))
+  dir_create(path(path_out, "icell", c("mean-pctl", "dist-stat", "etccdi", "metrics"), i_bads, i_ext))
+  
+  n_loop <- nrow(dat_inv_loop_mod)
+  n_shift <- -1
+  
+  foreach(i = 1:n_loop) %do% {
+    
+    i_rcm_name <-  dat_inv_loop_mod[i, institute_rcm]
+    files_read <- str_subset(files_bads, fixed(i_rcm_name))
+    
+    # if last file exists: skip rest of loop (save reading in a lot of data)
+    if(file_exists(path(path_out, "icell", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))) return(NULL)
+    
+    
+    lgl_pr <- any(str_detect(files_read, fixed("pr")))
+    
+    if(lgl_pr){
+      dat_pr <- nc_grid_to_dt(str_subset(files_read, "pr"))
+      setnames(dat_pr, 3, "pr")
+      dat_pr <- dat_pr[!is.na(pr)]
+    }      
+    
+    dat_tasmin <- nc_grid_to_dt(str_subset(files_read, "tasmin"))
+    setnames(dat_tasmin, 3, "tasmin")
+    dat_tasmin <- dat_tasmin[!is.na(tasmin)]
+    
+    dat_tasmax <- nc_grid_to_dt(str_subset(files_read, "tasmax"))
+    setnames(dat_tasmax, 3, "tasmax")
+    dat_tasmax <- dat_tasmax[!is.na(tasmax)]
+    
+    if(lgl_pr){
+      dat_i <- cbind(dat_pr, tasmax = dat_tasmax$tasmax, tasmin = dat_tasmin$tasmin)
+      rm(dat_pr, dat_tasmin, dat_tasmax);gc();
+      
+      dat_i[, hn := snowfall(pr, tasmax, tasmin)]
+      
+      map_vars <- c("pr", "hn", "tasmax", "tasmin")
+    } else {
+      dat_i <- cbind(dat_tasmax, tasmin = dat_tasmin$tasmin)
+      rm(dat_tasmin, dat_tasmax);gc();
+      
+      map_vars <- c("tasmax", "tasmin")
+    }
+    
+    dat_i[, season := mitmatmisc::season_fct(month(date))]
+    dat_i <- dat_i %>% merge(dat_orog[, .(icell, elev_fct)])
+    
+    
+    dat_i_tnaa <- dat_i[icell %in% icell_common,
+                        lapply(.SD, mean),
+                        .(date, season),
+                        .SDcols = map_vars]
+    
+    dat_i_elev <- dat_i[icell %in% icell_common,
+                        lapply(.SD, mean),
+                        .(date, season, elev_fct),
+                        .SDcols = map_vars]
+    
+    dat_i <- merge(dat_i, dat_crespi, by = c("icell", "date", "season", "elev_fct"))
+    dat_i_tnaa <- merge(dat_i_tnaa, dat_crespi_tnaa)
+    dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
+    
+    if(lgl_pr){
+      dat_i_tnaa[, pr_crespi := data.table::shift(pr_crespi, n_shift)]
+      dat_i_tnaa[, hn_crespi := data.table::shift(hn_crespi, n_shift)]
+      dat_i_tnaa <- dat_i_tnaa[!is.na(pr_crespi)]
+      
+      dat_i_elev[, pr_crespi := data.table::shift(pr_crespi, n_shift), .(elev_fct)]
+      dat_i_elev[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(elev_fct)]
+      dat_i_elev <- dat_i_elev[!is.na(pr_crespi)]
+      
+      dat_i[, pr_crespi := data.table::shift(pr_crespi, n_shift), .(icell)]
+      dat_i[, hn_crespi := data.table::shift(hn_crespi, n_shift), .(icell)]
+      dat_i <- dat_i[!is.na(pr_crespi)]
+      
+    }      
+    
+    # ** tnaa --------------------------------------------------------------------
+    
+    if(!file_exists(path(path_out, "tnaa", "mean-pctl", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      if(lgl_pr){
+        dat_i_tnaa_out1 <- dat_i_tnaa[, c(
+          mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+          pr_mean = mean(pr),
+          mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
+          hn_mean = mean(hn),
+          mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
+          mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+        ), .(season)]
+      } else {
+        dat_i_tnaa_out1 <- dat_i_tnaa[, c(
+          # mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+          # pr_mean = mean(pr),
+          # mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
+          # hn_mean = mean(hn),
+          mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
+          mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+        ), .(season)]
+      }
+      
+      saveRDS(dat_i_tnaa_out1, path(path_out, "tnaa", "mean-pctl", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    }
+    
+    
+    if(!file_exists(path(path_out, "tnaa", "ecdf", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      dat_i_tnaa_out2 <- map(map_vars, \(x){
+        dat_i_tnaa[, 
+                   .(qval = quantile(value, pctl_ecdf),
+                     pctl = pctl_ecdf,
+                     variable = x),
+                   .(season),
+                   env = list(value = x)]
+      }) %>% rbindlist  
+      
+      saveRDS(dat_i_tnaa_out2, path(path_out, "tnaa", "ecdf", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    }          
+    # 
+    # if(!file_exists(path(path_out, "tnaa", "dist-stat", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+    #   dat_i_tnaa_out3 <-  map(map_vars, \(x){
+    #     map(c("ad_test", "cvm_test", "ks_test", "wass_test"), \(y){
+    #       dat_i_tnaa[, 
+    #                  as.list(f_test(value, value_crespi, nboots = dist_stat_nboots, keep.boots = F)) %>% 
+    #                    setNames(c("dist_stat", "pval")) %>% 
+    #                    c(dist_test = y, variable = x),
+    #                  .(season),
+    #                  env = list(f_test = y, value = x, value_crespi = str_c(x, "_crespi"))]
+    #     }) %>% rbindlist
+    #   }) %>% rbindlist   
+    #   saveRDS(dat_i_tnaa_out3, path(path_out, "tnaa", "dist-stat", i_bads, i_rcm_name, ext = "rds"))
+    # }
+    
+    
+    if(!file_exists(path(path_out, "tnaa", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      dat_i_tnaa_out6 <- map(map_vars, \(x){
+        dat_i_tnaa[, 
+                   .(mae = mean(abs(value - value_crespi)),
+                     bias = mean(value - value_crespi),
+                     bias_rel = mean(value - value_crespi)/mean(value_crespi),
+                     corr = cor(value, value_crespi),
+                     variable = x),
+                   .(season),
+                   env = list(value = x, value_crespi = str_c(x, "_crespi"))]
+      }) %>% rbindlist  
+      
+      saveRDS(dat_i_tnaa_out6, path(path_out, "tnaa", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    } 
+    
+    
+    if(!file_exists(path(path_out, "tnaa", "spatcor", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      dat_i_tnaa_out7 <- map(map_vars, \(x){
+        dat_i[, 
+              .(spatcor = suppressWarnings(cor(value, value_crespi)),
+                spatcor_nonzero = suppressWarnings(
+                  cor(value[value > 0 & value_crespi > 0], 
+                      value_crespi[value > 0 & value_crespi > 0])
+                ),
+                variable = x),
+              .(season, date),
+              env = list(value = x, value_crespi = str_c(x, "_crespi"))] %>% 
+          .[,
+            .(spatcor = mean(spatcor, na.rm = T),
+              spatcor_nonzero = mean(spatcor_nonzero, na.rm = T)),
+            .(season, variable)]
+      }) %>% rbindlist   
+      
+      saveRDS(dat_i_tnaa_out7, path(path_out, "tnaa", "spatcor", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    } 
+    
+    
+    # ** elev --------------------------------------------------------------------
+    
+    if(!file_exists(path(path_out, "elev", "mean-pctl", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      if(lgl_pr){
+        dat_i_elev_out1 <- dat_i_elev[, c(
+          mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+          pr_mean = mean(pr),
+          mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
+          hn_mean = mean(hn),
+          mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
+          mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+        ), .(season, elev_fct)]
+      } else {
+        dat_i_elev_out1 <- dat_i_elev[, c(
+          # mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+          # pr_mean = mean(pr),
+          # mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
+          # hn_mean = mean(hn),
+          mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
+          mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+        ), .(season, elev_fct)]
+      }
+      
+      saveRDS(dat_i_elev_out1, path(path_out, "elev", "mean-pctl", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    }
+    
+    if(!file_exists(path(path_out, "elev", "ecdf", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      dat_i_elev_out2 <- map(map_vars, \(x){
+        dat_i_elev[, 
+                   .(qval = quantile(value, pctl_ecdf),
+                     pctl = pctl_ecdf,
+                     variable = x),
+                   .(season, elev_fct),
+                   env = list(value = x)]
+      }) %>% rbindlist    
+      
+      saveRDS(dat_i_elev_out2, path(path_out, "elev", "ecdf", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    }
+    # 
+    # if(!file_exists(path(path_out, "elev", "dist-stat", i_bads, i_rcm_name, ext = "rds"))){
+    #   dat_i_elev_out3 <-  map(map_vars, \(x){
+    #     map(c("ad_test", "cvm_test", "ks_test", "wass_test"), \(y){
+    #       dat_i_elev[, 
+    #                  as.list(f_test(value, value_crespi, nboots = dist_stat_nboots, keep.boots = F)) %>% 
+    #                    setNames(c("dist_stat", "pval")) %>% 
+    #                    c(dist_test = y, variable = x),
+    #                  .(season, elev_fct),
+    #                  env = list(f_test = y, value = x, value_crespi = str_c(x, "_crespi"))]
+    #     }) %>% rbindlist
+    #   }) %>% rbindlist  
+    #   
+    #   saveRDS(dat_i_elev_out3, path(path_out, "elev", "dist-stat", i_bads, i_rcm_name, ext = "rds"))
+    # }
+    # 
+    if(!file_exists(path(path_out, "elev", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      dat_i_elev_out6 <- map(map_vars, \(x){
+        dat_i_elev[, 
+                   .(mae = mean(abs(value - value_crespi)),
+                     bias = mean(value - value_crespi),
+                     bias_rel = mean(value - value_crespi)/mean(value_crespi),
+                     corr = cor(value, value_crespi),
+                     variable = x),
+                   .(season, elev_fct),
+                   env = list(value = x, value_crespi = str_c(x, "_crespi"))]
+      }) %>% rbindlist  
+      
+      saveRDS(dat_i_elev_out6, path(path_out, "elev", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    }
+    
+    
+    
+    # ** icell ----------------------------------------------------------------
+    
+    if(!file_exists(path(path_out, "icell", "mean-pctl", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      if(lgl_pr){
+        dat_i_icell_out1 <- dat_i[, c(
+          mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+          pr_mean = mean(pr),
+          mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
+          hn_mean = mean(hn),
+          mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
+          mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+        ), .(season, icell)]
+      } else {
+        dat_i_icell_out1 <- dat_i[, c(
+          # mitmatmisc::calc_pctl(pr, pctl_pr, "pr_p"),
+          # pr_mean = mean(pr),
+          # mitmatmisc::calc_pctl(hn, pctl_pr, "hn_p"),
+          # hn_mean = mean(hn),
+          mitmatmisc::calc_pctl(tasmin, pctl_tas, "tasmin_p"),
+          mitmatmisc::calc_pctl(tasmax, pctl_tas, "tasmax_p")
+        ), .(season, icell)]
+      }
+      
+      saveRDS(dat_i_icell_out1, path(path_out, "icell", "mean-pctl", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    }
+    
+    
+    if(!file_exists(path(path_out, "icell", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))){
+      
+      dat_i_icell_out6 <- map(map_vars, \(x){
+        dat_i[, 
+              .(mae = mean(abs(value - value_crespi)),
+                bias = mean(value - value_crespi),
+                bias_rel = mean(value - value_crespi)/mean(value_crespi),
+                corr = cor(value, value_crespi),
+                variable = x),
+              .(season, icell),
+              env = list(value = x, value_crespi = str_c(x, "_crespi"))]
+      }) %>% rbindlist  
+      
+      saveRDS(dat_i_icell_out6, path(path_out, "icell", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))
+    }
+    
+    
+  }
+  
+  
+  
+  
+  # end i_ext ---------------------------------------------------------------
+  
+  
+  cat(format(Sys.time()), "- done ", i_ext, "\n")
+  # dir_delete(path_tmp_nc)
+  
+  
+  
+  
+  
+  
+  
 }
-
-saveRDS(zz2, "data/coef-bathends-pcalm.rds")
-

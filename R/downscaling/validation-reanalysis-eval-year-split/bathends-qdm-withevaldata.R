@@ -17,15 +17,17 @@ source("R/functions/get_nc_1d.R")
 source("R/functions/inv_sub_reanalysis.R")
 source("R/functions/snowfall.R")
 
+# extended_l_years_train_period <- readRDS("data/random-years-reanalysis2-extended.rds")
 extended_l_years_train_period <- readRDS("data/random-years-reanalysis-extended.rds")
 
-path_tmp_nc <- "/home/climatedata/downscaling/validation-cv-reanalysis/zz-tmp-bads/"
+path_tmp_nc <- "/home/climatedata/downscaling/validation-cv-reanalysis/zz-tmp-qdm/"
 # if(dir_exists(path_tmp_nc)) stop("tmp directory exists!")
 dir_create(path_tmp_nc)
 
+path_in_baqdm <- "/home/climatedata/downscaling/validation-cv-reanalysis/data-daily-v6/ba-qdm/"
+
 
 # settings ba ds ----------------------------------------------------
-
 
 date_rcm_sub <- as.Date(c("1989-01-02", "2008-12-31"))
 
@@ -34,7 +36,9 @@ l_ratio <- list(tasmax = F, tasmin = F, pr = T) # QDM: ratio in QDM()
 
 temp_mv <- F # temporal moving window +-1 month? 
 n_nc_sync <- 200 # intermediate save to nc_out file every n cells
-n_cores <- 4 # parallel computation; bottleneck maybe disk access?
+n_cores <- 1 # parallel computation; bottleneck maybe disk access; (reads RCM memory, crespi cell-by-cell)
+
+upscaled_crespi <- T # needed info, because different NA cells at boundaries
 
 l_file_obs <- list(
   tasmax = "/home/climatedata/obs/CRESPI/daily_1km_lonlat/DailySeries_1980_2020_MaxTemp.nc",
@@ -52,11 +56,8 @@ l_file_obs_orog <- list(
 
 dat_inv <- inv_sub_reanalysis()
 dat_inv_loop <- dat_inv[variable %in% c("tasmin", "tasmax", "pr")]
-
 dat_inv_loop_mod <- dat_inv_loop[, .(gcm, institute_rcm, experiment, 
                                      ensemble, downscale_realisation)] %>% unique()
-
-
 
 # ** settings eval ** -----------------------------------------------------
 
@@ -148,6 +149,7 @@ dat_crespi_elev <- dat_crespi[icell %in% icell_common,
                               .SDcols = str_c(c("pr", "hn", "tasmax", "tasmin"), "_crespi")]
 
 
+
 # ** start loop extended years ** ---------------------------------------------------------------
 
 mitmatmisc::init_parallel_ubuntu(n_cores)
@@ -159,26 +161,27 @@ for(i_ext in 1:length(extended_l_years_train_period)){
   l_years_train_period <- extended_l_years_train_period[[i_ext]]
   
   
+  files_ba <- dir_ls(path(path_in_baqdm, i_ext))
+  
   zz <- foreach(
-    i_inv = 1:nrow(dat_inv_loop),
+    i_file_ba = files_ba,
     .inorder = F
   ) %dopar% {
     
-    i_rcm_name <- dat_inv_loop[i_inv, institute_rcm]
-    i_var <- dat_inv_loop[i_inv, variable]
+    i_file_ba_split <- i_file_ba %>% 
+      path_file() %>% 
+      str_split_1("_")
     
+    i_rcm_name <- i_file_ba_split[2]
+    i_var <- i_file_ba_split[1]
+    file_rcm <- i_file_ba
     
     file_rcm_orog <- dat_inv[variable == "orog" & institute_rcm == i_rcm_name, list_files[[1]]]
-    file_rcm <- dat_inv_loop[i_inv, list_files[[1]]]
     file_obs_orog <- l_file_obs_orog[[i_var]]
     
     file_out <- path(path_tmp_nc,
                      i_ext,
-                     dat_inv_loop[i_inv, 
-                                  paste(variable, institute_rcm, 
-                                        gcm, experiment, sep = "_")],
-                     ext = "nc")
-    dir_create(path_dir(file_out))
+                     path_file(i_file_ba))
     
     
     if(file_exists(file_out)) return(NULL)
@@ -192,8 +195,10 @@ for(i_ext in 1:length(extended_l_years_train_period)){
     rs_rcm_orog <- rast(file_rcm_orog)
     rs_obs_orog <- rast(file_obs_orog)
     
-    cells_obs <- which(!is.na(rs_obs_orog[]))
-    cells_obs_na <- which(is.na(rs_obs_orog[]))
+    if(!upscaled_crespi){
+      cells_obs <- which(!is.na(rs_obs_orog[]))
+      cells_obs_na <- which(is.na(rs_obs_orog[]))
+    }
     
     rs_rcm <- rast(file_rcm)
     mat_rcm <- values(rs_rcm, mat = T)
@@ -226,8 +231,24 @@ for(i_ext in 1:length(extended_l_years_train_period)){
     # rs_cells_rcm_obs[is.na(rs_obs_orog)] <- NA # mask outside TNAA?
     names(rs_cells_rcm_obs) <- "rcm_cell"
     
+    
+    # update cells na (upscaled crespi) ---------------------------------------------------
+    
+    if(upscaled_crespi){
+      
+      # rs_zz <- unwrap(wrap())
+      icell_na_upscale <- which(is.na(rs_rcm[[1]][]))
+      # which(rs_cells_rcm_obs[] %in% icell_na_upscale)
+      
+      cells_obs <- intersect(which(!rs_cells_rcm_obs[] %in% icell_na_upscale),
+                             which(!is.na(rs_obs_orog[])))
+      cells_obs_na <- setdiff(1:ncell(rs_obs_orog), cells_obs)
+    }
+    
+    
     # outfile ---------------------------------------------------------
     
+    dir_create(path_dir(file_out))
     create_emtpy_netcdf(file_template = file_obs_orog,
                         file_out = file_out,
                         l_varinfo = l_nc_info[[i_var]],
@@ -261,11 +282,12 @@ for(i_ext in 1:length(extended_l_years_train_period)){
       i_cell_rcm <- as.vector(rs_cells_rcm_obs)[i_cell]
       vals_rcm <- mat_rcm[i_cell_rcm, ]
       
-      if(i_var == "pr"){
-        vals_rcm <- vals_rcm*24*3600
-      } else {
-        vals_rcm <- vals_rcm-273.15
-      }
+      
+      # if(i_var == "pr"){
+      #   vals_rcm <- vals_rcm*24*3600
+      # } else {
+      #   vals_rcm <- vals_rcm-273.15
+      # }
       
       # non-standard cal adjustment
       vals_rcm <- vals_rcm[mapped_times$idx_pcict]
@@ -357,10 +379,11 @@ for(i_ext in 1:length(extended_l_years_train_period)){
   
   
   
+  
   # ** start eval ** ----------------------------------------------------------------
   
   i_path <- path(path_tmp_nc, i_ext)
-  i_bads <- "bads-qdm"
+  i_bads <- "ba-qdm-ds-qdm"
   
   path_out <- "/home/climatedata/downscaling/validation-cv-reanalysis/rdata-summary-v6/"
   dir_create(path(path_out, "tnaa", c("mean-pctl", "ecdf", "dist-stat", "metrics", "spatcor")))
@@ -386,7 +409,7 @@ for(i_ext in 1:length(extended_l_years_train_period)){
     
     i_rcm_name <-  dat_inv_loop_mod[i, institute_rcm]
     files_read <- str_subset(files_bads, fixed(i_rcm_name))
-  
+    
     # if last file exists: skip rest of loop (save reading in a lot of data)
     if(file_exists(path(path_out, "icell", "metrics", i_bads, i_ext, i_rcm_name, ext = "rds"))) return(NULL)
     
@@ -434,7 +457,7 @@ for(i_ext in 1:length(extended_l_years_train_period)){
                         lapply(.SD, mean),
                         .(date, season, elev_fct),
                         .SDcols = map_vars]
-
+    
     dat_i <- merge(dat_i, dat_crespi, by = c("icell", "date", "season", "elev_fct"))
     dat_i_tnaa <- merge(dat_i_tnaa, dat_crespi_tnaa)
     dat_i_elev <- merge(dat_i_elev, dat_crespi_elev)
@@ -672,14 +695,12 @@ for(i_ext in 1:length(extended_l_years_train_period)){
   
   
   
-
-# end i_ext ---------------------------------------------------------------
-
+  
+  # end i_ext ---------------------------------------------------------------
+  
   
   cat(format(Sys.time()), "- done ", i_ext, "\n")
   # dir_delete(path_tmp_nc)
-  
-  
   
   
   
