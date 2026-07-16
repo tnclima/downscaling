@@ -32,7 +32,7 @@ dat2 <- dat1 %>%
 dat2[, season := factor(season, levels = c("DJF", "MAM", "JJA", "SON"))]
 # dat2[, value_sc := scale(value), .(variable, season, pc)]
 dat2[, ff := factor(ff, levels = c("all", "no dry", "full wet"))]
-
+dat2[, ff2 := fct_recode(ff, "all\n(manuscript)" = "all")]
 
 # plot --------------------------------------------------------------------
 
@@ -44,7 +44,7 @@ dat2[variable == "pr" & season == "DJF" & pc %in% str_c("PC", 1:5)] %>%
   ggplot(aes(x, y, fill = value))+
   geom_raster()+
   # facet_grid(pc ~ ff)+
-  facet_grid(ff ~ pc)+
+  facet_grid(ff2 ~ pc)+
   scale_fill_scico(palette = "vik", midpoint = 0)+
   coord_quickmap()+
   theme_bw()+
@@ -60,7 +60,7 @@ gg_pr2 <-
   ggplot(aes(x, y, fill = value))+
   geom_raster()+
   # facet_grid(pc ~ ff)+
-  facet_grid(ff ~ pc)+
+  facet_grid(ff2 ~ pc)+
   scale_fill_scico(palette = "vik", midpoint = 0)+
   coord_quickmap()+
   theme_bw()+
@@ -79,5 +79,5 @@ gg_out <- wrap_plots(gg_pr1, gg_pr2, ncol = 1) &
         panel.grid = element_blank())
   
 
-ggsave("fig/paper-ds-rev1/pca-precip-drywet.png", gg_out, width = 7, height = 8)
+ggsave("fig/paper-ds-pdf/pca-precip-drywet.pdf", gg_out, width = 7, height = 8)
 

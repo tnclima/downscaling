@@ -90,7 +90,7 @@ gg <-
   ylab(NULL)
 
 
-ggsave("fig/paper-ds/ds-metrics_tasmax.png",
+ggsave("fig/paper-ds-pdf/ds-metrics_tasmax.pdf",
        gg, width = 8, height = 6)
 
 
@@ -110,7 +110,7 @@ gg <- dat_plot[variable == "tasmin" & bads_multi == F & metric != "bias_rel"] %>
   ylab(NULL)
 
 
-ggsave("fig/paper-ds/ds-metrics_tasmin.png",
+ggsave("fig/paper-ds-pdf/ds-metrics_tasmin.pdf",
        gg, width = 8, height = 6)
 
 
@@ -129,7 +129,7 @@ gg <- dat_plot[variable == "pr" & bads_multi == F & metric != "bias"] %>%
   ylab(NULL)
 
 
-ggsave("fig/paper-ds/ds-metrics_pr.png",
+ggsave("fig/paper-ds-pdf/ds-metrics_pr.pdf",
        gg, width = 8, height = 6)
 
 
@@ -160,7 +160,7 @@ gg <-
   ylab(NULL)
 
 
-ggsave("fig/paper-ds/ds-metrics_hn.png",
+ggsave("fig/paper-ds-pdf/ds-metrics_hn.pdf",
        gg, width = 8, height = 5)
 
 

@@ -268,7 +268,7 @@ wrap_plots( #wrap_plots(gg_crespi, gg_crespi_011, nrow = 1),
   plot_annotation(tag_levels = "a", tag_suffix = ")")
 
 
-ggsave("fig/paper-ds/ds-example-maps_tasmax.png", 
+ggsave("fig/paper-ds-pdf/ds-example-maps_tasmax.pdf", 
        gg_out, width = 6.5, height = 8)
 
 
@@ -429,7 +429,7 @@ gg_out <-
   plot_annotation(tag_levels = "a", tag_suffix = ")")
 
 
-ggsave("fig/paper-ds/ds-example-maps_tasmin.png", 
+ggsave("fig/paper-ds-pdf/ds-example-maps_tasmin.pdf", 
        gg_out, width = 6.5, height = 8)
 
 
@@ -590,7 +590,7 @@ gg_out <-
   plot_annotation(tag_levels = "a", tag_suffix = ")")
 
 
-ggsave("fig/paper-ds/ds-example-maps_pr.png", 
+ggsave("fig/paper-ds-pdf/ds-example-maps_pr.pdf", 
        gg_out, width = 5.5, height = 8)
 
 

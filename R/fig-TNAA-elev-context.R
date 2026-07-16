@@ -47,7 +47,7 @@ sf_gar2 <- rs_10km %>%
   st_as_sfc()
 
 
-
+st_crs(gisco_countries) <- st_crs(4326)
 countries_sub <- st_transform(gisco_countries, st_crs(rs_1km)) %>% 
   st_crop(rs_1km)
 
@@ -95,6 +95,7 @@ gg_out <- (gg_tnaa+gg_ita)+
 
 
 ggsave("fig/study-region/TNAA-elev-Italy.png", gg_out, width = 8, height = 5)
+ggsave("fig/study-region/TNAA-elev-Italy.pdf", gg_out, width = 8, height = 5)
 
 
 
@@ -117,6 +118,7 @@ gg_out <- (gg_tnaa+(gg_ita/gg_world))+
 
 
 ggsave(filename = "fig/study-region/TNAA-elev-Italy-World.png", gg_out, width = 8, height = 5)
+ggsave(filename = "fig/study-region/TNAA-elev-Italy-World.pdf", gg_out, width = 8, height = 5)
 
 
 
@@ -164,5 +166,6 @@ gg_out <-
 
 
 ggsave("fig/study-region/TNAA-elev-GAR-world.png", gg_out, width = 8, height = 5)
+ggsave("fig/study-region/TNAA-elev-GAR-world.pdf", gg_out, width = 8, height = 5)
 
 

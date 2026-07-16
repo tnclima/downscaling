@@ -126,7 +126,7 @@ gg_out <- (gg_tasmin / gg_pr)+
   plot_annotation(tag_levels = "a", tag_suffix = ")")
 
 
-ggsave("fig/paper-ds/sep-ba-ds.png",
+ggsave("fig/paper-ds-pdf/sep-ba-ds.pdf",
        gg_out, width = 10, height = 4)
 
 

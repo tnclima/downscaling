@@ -128,7 +128,7 @@ dat_plot[variable == "pr" & !bads %in% c("ba-qdm-ds-lr", "ba-qdm-ds-gam")] |>
 
 
 
-ggsave(filename = "fig/paper-ds/ds-metrics-icell-quantiles_ensavg_pr.png",
+ggsave(filename = "fig/paper-ds-pdf/ds-metrics-icell-quantiles_ensavg_pr.pdf",
        gg_pr,
        width = 10, height = 7)
 
@@ -149,7 +149,7 @@ dat_plot[variable == "tasmin"] |>
 
 
 
-ggsave(filename = "fig/paper-ds/ds-metrics-icell-quantiles_ensavg_tasmin.png",
+ggsave(filename = "fig/paper-ds-pdf/ds-metrics-icell-quantiles_ensavg_tasmin.pdf",
        gg_tasmin,
        width = 9, height = 12)
 
@@ -171,7 +171,7 @@ gg_tasmax <- dat_plot[variable == "tasmax"] |>
 
 
 
-ggsave(filename = "fig/paper-ds/ds-metrics-icell-quantiles_ensavg_tasmax.png",
+ggsave(filename = "fig/paper-ds-pdf/ds-metrics-icell-quantiles_ensavg_tasmax.pdf",
        gg_tasmax,
        width = 9, height = 12)
 
@@ -251,7 +251,7 @@ gg_011_pr <- dat_plot_011[variable == "pr"] |>
   ggtitle("pr")
 
 gg_out <- (gg_011_pr + gg_011_tasmax + gg_011_tasmin)
-ggsave("fig/paper-ds/ds-metrics-icell-quantiles_ensavg_011.png", 
+ggsave("fig/paper-ds-pdf/ds-metrics-icell-quantiles_ensavg_011.pdf", 
        gg_out, width = 12, height = 10)
 
 # numbers -----------------------------------------------------------------

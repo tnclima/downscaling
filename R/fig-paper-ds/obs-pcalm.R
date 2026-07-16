@@ -65,7 +65,7 @@ dat_plot[variable == "pr"] |>
   xlab("# PC")+
   ylab(NULL)
 
-ggsave("fig/paper-ds/obs-ds-pcalm_pr.png",
+ggsave("fig/paper-ds-pdf/obs-ds-pcalm_pr.pdf",
        gg1,
        width = 12, height = 6)
 
@@ -84,7 +84,7 @@ gg1 <-
   xlab("# PC")+
   ylab(NULL)
 
-ggsave("fig/paper-ds/obs-ds-pcalm_tasmin.png",
+ggsave("fig/paper-ds-pdf/obs-ds-pcalm_tasmin.pdf",
        gg1,
        width = 12, height = 5)
 
@@ -105,7 +105,7 @@ gg1 <-
   xlab("# PC")+
   ylab(NULL)
 
-ggsave("fig/paper-ds/obs-ds-pcalm_tasmax.png",
+ggsave("fig/paper-ds-pdf/obs-ds-pcalm_tasmax.pdf",
        gg1,
        width = 12, height = 5)
 
@@ -158,4 +158,4 @@ gg2 <- gg_tasmin_bias + gg_tasmin_mae + plot_layout(guides = "collect")
 
 gg_out <- gg1/gg2
 
-ggsave("fig/paper-ds/obs-ds-pcalm_subset.png", gg_out, width = 11, height = 5)
+ggsave("fig/paper-ds-pdf/obs-ds-pcalm_subset.pdf", gg_out, width = 11, height = 5)

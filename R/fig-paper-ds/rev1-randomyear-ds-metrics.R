@@ -55,7 +55,9 @@ dat_ba_randyear <- map(
   }
 ) %>% rbindlist(fill = T)
 
-
+dat_ba_randyear <- dat_ba_randyear[bads %in% c(
+  "ba-qdm-ds-pcalm", "ba-qdm-ds-qdm2", "bads-qdm"
+)]
 
 dat_plot <- dat_ba[bads %in% dat_ba_randyear$bads] |> 
   cbind(randyear = "0") |> 
@@ -167,5 +169,5 @@ gg <-
   ylab(NULL)
 
 
-ggsave("fig/paper-ds-rev1/randyear-metrics_pr_MAM.png",
+ggsave("fig/paper-ds-pdf/randyear-metrics_pr_MAM.pdf",
        gg, width = 12, height = 8)

@@ -93,5 +93,5 @@ gg_out <- wrap_plots(gg_pr, gg_tas, ncol = 1, heights = c(2,1)) &
         panel.grid = element_blank())
   
 
-ggsave("fig/paper-ds/pca-djf-subset.png", gg_out, width = 8, height = 6)
+ggsave("fig/paper-ds-pdf/pca-djf-subset.pdf", gg_out, width = 8, height = 6)
 

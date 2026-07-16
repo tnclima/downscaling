@@ -321,7 +321,7 @@ gg_pr_out <- (gg_pr_bias+gg_pr_mae+gg_pr_corr)+
   plot_annotation(tag_level = "a", tag_suffix = ")")
 
 
-ggsave(filename = "fig/paper-ds/ds-metrics-icell_ensavg_pr.png",
+ggsave(filename = "fig/paper-ds-pdf/ds-metrics-icell_ensavg_pr.pdf",
        gg_pr_out,
        width = 10, height = 10)
 
@@ -394,7 +394,7 @@ gg_tas_out <- (gg_tas_bias+gg_tas_mae+gg_tas_corr)+
 
 
 
-ggsave(filename = "fig/paper-ds/ds-metrics-icell_ensavg_tasminmax.png",
+ggsave(filename = "fig/paper-ds-pdf/ds-metrics-icell_ensavg_tasminmax.pdf",
        gg_tas_out,
        width = 12, height = 13)
 
@@ -492,7 +492,7 @@ gg_hn_out <- (gg_hn_bias_rel+gg_hn_bias+gg_hn_mae+gg_hn_corr)+
   plot_annotation(tag_level = "a", tag_suffix = ")")
 
 
-ggsave(filename = "fig/paper-ds/ds-metrics-icell_ensavg_hn.png",
+ggsave(filename = "fig/paper-ds-pdf/ds-metrics-icell_ensavg_hn.pdf",
        gg_hn_out,
        width = 10, height = 14)
 
@@ -533,7 +533,7 @@ dat_plot_hn_violin[!(metric == "bias_rel" & value > 1)] |>
   theme(legend.position = "bottom")+
   xlab(NULL)+ylab(NULL)
 
-ggsave(filename = "fig/paper-ds/ds-metrics-icell_ensavg_hn_violin.png",
+ggsave(filename = "fig/paper-ds-pdf/ds-metrics-icell_ensavg_hn_violin.pdf",
        gg_hn,
        width = 10, height = 5)
 
@@ -602,7 +602,7 @@ gg_out <- (gg1+gg2+gg3)+
   plot_layout(ncol = 1)
 
 
-ggsave(filename = "fig/paper-ds/eval-ds-maps-pr.png",
+ggsave(filename = "fig/paper-ds-pdf/eval-ds-maps-pr.pdf",
        gg_out,
        width = 8, height = 6)
 
@@ -672,7 +672,7 @@ gg_out <- (gg4+gg5+gg6)+
   plot_layout(ncol = 1)
 
 
-ggsave(filename = "fig/paper-ds/eval-ds-maps-tasmax.png",
+ggsave(filename = "fig/paper-ds-pdf/eval-ds-maps-tasmax.pdf",
        gg_out,
        width = 12, height = 6)
 

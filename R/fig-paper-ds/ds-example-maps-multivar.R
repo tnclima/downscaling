@@ -412,9 +412,9 @@ gg_out <-
   plot_annotation(tag_levels = "a", tag_suffix = ")")
 
 
-ggsave("fig/paper-ds/ds-example-maps_multivar.png", 
-       gg_out, width = 8, height = 6)
+# ggsave("fig/paper-ds/ds-example-maps_multivar.png", 
+#        gg_out, width = 8, height = 6)
 
-ggsave("fig/paper-ds-rev1/ds-example-maps_multivar.pdf", 
+ggsave("fig/paper-ds-pdf/ds-example-maps_multivar.pdf", 
        gg_out, width = 8, height = 6)
 

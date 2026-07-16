@@ -51,6 +51,10 @@ dat_ba_randyear <- map(
         }) |> rbindlist(fill = T)
   }) %>% rbindlist(fill = T)
 
+dat_ba_randyear <- dat_ba_randyear[bads %in% c(
+  "ba-qdm-ds-pcalm", "ba-qdm-ds-qdm2", "bads-qdm"
+)]
+
 
 
 dat_plot <- dat_ba[bads %in% dat_ba_randyear$bads] |> 
@@ -151,7 +155,7 @@ gg_out <- (gg1+gg2+gg3)+
   theme(legend.position = "bottom")
 
 
-ggsave(filename = "fig/paper-ds-rev1/randyear-maps_pr.png",
+ggsave(filename = "fig/paper-ds-pdf/randyear-maps_pr.pdf",
        gg_out,
        width = 12, height = 20)
 
@@ -222,7 +226,7 @@ gg_out <- (gg4+gg5+gg6)+
   theme(legend.position = "bottom")
 
 
-ggsave(filename = "fig/paper-ds-rev1/randyear-maps_tasmax.png",
+ggsave(filename = "fig/paper-ds-pdf/randyear-maps_tasmax.pdf",
        gg_out,
        width = 12, height = 20)
 

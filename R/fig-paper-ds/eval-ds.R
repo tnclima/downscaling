@@ -127,7 +127,7 @@ gg_out <- (gg_tasmax / gg_pr)+
   plot_annotation(tag_levels = "a", tag_suffix = ")")
 
 
-ggsave("fig/paper-ds/eval-ds.png",
+ggsave("fig/paper-ds-pdf/eval-ds.pdf",
        gg_out, width = 10, height = 4)
 
 

@@ -86,7 +86,7 @@ dat_plot_spatcor %>%
   ylab(NULL)+
   xlab("Average correlation across space wrt observations")
 
-ggsave("fig/paper-ds/spatcor.png",
+ggsave("fig/paper-ds-pdf/spatcor.pdf",
        gg, width = 10, height = 6)
 
 

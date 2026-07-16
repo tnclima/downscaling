@@ -133,7 +133,7 @@ dat_plot[(variable == "tasmin" & season == "DJF") |
   xlab("Observed quantile")+
   ylab("Downscaling Model quantile")
 
-ggsave("fig/paper-ds/qq-bads-tasminmax.png",
+ggsave("fig/paper-ds-pdf/qq-bads-tasminmax.pdf",
        gg, width = 12, height = 5)
 
 
@@ -150,7 +150,7 @@ dat_plot[(variable == "tasmin" & season == "DJF") |
   xlab("Observed quantile")+
   ylab("Difference in quantiles (between downscaled and observed)")
 
-ggsave("fig/paper-ds/qq-bads-tasminmax_absdiff.png",
+ggsave("fig/paper-ds-pdf/qq-bads-tasminmax_absdiff.pdf",
        gg, width = 12, height = 5)
 
 
@@ -170,7 +170,7 @@ gg <- dat_plot[variable == "pr"] |>
   xlab("Observed quantile")+
   ylab("Downscaling Model quantile")
 
-ggsave("fig/paper-ds/qq-bads-pr.png",
+ggsave("fig/paper-ds-pdf/qq-bads-pr.pdf",
        gg, width = 10, height = 6)
 
 gg <- dat_plot[variable == "pr" & pctl > 0.25] |> 
@@ -189,7 +189,7 @@ gg <- dat_plot[variable == "pr" & pctl > 0.25] |>
   xlab("Observed quantile")+
   ylab("Difference in quantiles (between downscaled and observed)")
 
-ggsave("fig/paper-ds/qq-bads-pr_reldiff.png",
+ggsave("fig/paper-ds-pdf/qq-bads-pr_reldiff.pdf",
        gg, width = 10, height = 6)
 
 # qq-plot 011--------------------------------------------------------------------
@@ -218,7 +218,7 @@ gg2 <- dat_plot_011[bads == "ba-qdm" & variable %in% c("tasmin", "tasmax")] |>
 gg_out <- (gg1/gg2)+
   plot_layout(heights = c(1,2), axis_titles = "collect")
 
-ggsave("fig/paper-ds/qq-ba.png",
+ggsave("fig/paper-ds-pdf/qq-ba.pdf",
        gg_out, width = 10, height = 6)
 
 
@@ -255,7 +255,7 @@ gg2 <-
 gg_out <- (gg1/gg2)+
   plot_layout(heights = c(1,2), axis_titles = "collect")
 
-ggsave("fig/paper-ds/qq-ba_diff.png",
+ggsave("fig/paper-ds-pdf/qq-ba_diff.pdf",
        gg_out, width = 10, height = 6)
 
 

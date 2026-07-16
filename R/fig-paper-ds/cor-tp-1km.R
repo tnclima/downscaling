@@ -67,6 +67,6 @@ gg2_obs <-
 gg_out <- (gg1_corr / gg2_obs)+
   plot_layout(heights = c(8, 1))
 
-ggsave("fig/paper-ds/corr-tasmax-pr-apr.png",
+ggsave("fig/paper-ds-pdf/corr-tasmax-pr-apr.pdf",
        gg_out, width = 12, height = 14)
 
